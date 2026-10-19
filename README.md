@@ -4,21 +4,22 @@ A local-first portfolio project: submit one webpage URL, audit its images in the
 background, and inspect issues and an image inventory. An MCP interface is planned
 for the same workflow.
 
-**Milestone 4 adds demo bearer authentication and per-user audit ownership.**
+**Milestone 5 adds the authenticated React audit workflow and image inventory.**
 The reusable static audit engine remains independent of routes and persistence.
-The React UI still shows the connection check; inventory UI and MCP are deferred.
+The UI supports submission, progress, recent jobs, filters and exports. MCP is deferred.
 
 ## Run locally
 
 Use Node.js 24 LTS (recommended; `.nvmrc`) or Node.js 26, with npm.
-No credentials, cloud services, global packages, or LLM API keys are needed.
+No cloud services, global packages, or LLM API keys are needed. Generate a local demo token to use the UI.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. The UI should show **Connected · API healthy**.
+Open http://127.0.0.1:5173. The UI opens the **local demo token connection screen**.
+Follow the frontend workflow below to provision a token and start the worker.
 The API at http://127.0.0.1:3001 exposes `GET /api/health`:
 
 ```json
@@ -27,8 +28,7 @@ The API at http://127.0.0.1:3001 exposes `GET /api/health`:
 
 Both processes bind to loopback. Free ports 3001 and 5173 before starting; Vite
 fails on conflicts instead of choosing another port. Ctrl+C stops development.
-To test failure/recovery, run only `npm run dev:web`, then start
-`npm run dev:api` separately and click **Check again**.
+To test failure/recovery, run only `npm run dev:web`, attempt to connect, then start `npm run dev:api` separately and retry **Connect**.
 
 ## Commands
 
@@ -40,6 +40,8 @@ To test failure/recovery, run only `npm run dev:web`, then start
 | `npm test` | API tests and local HTTP audit fixtures; no external websites |
 | `npm run build` | Type-check, emit Node ESM, bundle frontend |
 | `npm run check` | Tests plus complete build/type checks |
+| `npm run test:ui` | Chromium browser tests with local API/worker fixtures |
+| `npm run check:all` | All Node and browser tests plus build/type checks |
 | `npm run start:api` | Run compiled API after build |
 | `npm run dev:worker` / `npm run start:worker` | Separate development / compiled worker |
 | `npm run db:migrate` | Apply SQLite migrations |
@@ -57,7 +59,7 @@ One repository, one package and lockfile, with separate process entry points.
 ```text
 src/
   api/                 Fastify app factory and HTTP entry point
-  web/                 React + Vite connection-status UI
+  web/                 React screens, API client, cancellable polling and exports
   application/
     auth.ts            Demo authentication adapter and token provisioning
     audit-service.ts   Shared authenticated ownership boundary for API/future MCP
@@ -78,10 +80,10 @@ data/                  SQLite runtime files and sidecars (ignored)
 ```
 
 The audit module depends on Node HTTP and Cheerio, with no imports from routes,
-the database, or UI. Planned flow: React → API → application services → SQLite;
+the database, or UI. Flow: React → API → application services → SQLite;
 MCP → the same services; worker → SQLite queue → audit engine → stored results.
 Queue claims, leases, retries, crash recovery, and persistence are implemented.
-The frontend submission flow and MCP adapter remain future work.
+The frontend submission flow is implemented. The MCP adapter remains future work.
 
 Node uses native ESM with NodeNext resolution; the frontend uses bundler
 resolution. Both inherit strict checking, checked indexing, and exact optional
@@ -247,8 +249,7 @@ Invoke-RestMethod ("http://127.0.0.1:3001" + $job.resultsUrl) -Headers $headers
 Invoke-RestMethod 'http://127.0.0.1:3001/api/audits?limit=20' -Headers $headers
 ```
 
-The React page remains a connection check; a submission form and inventory UI
-are not included in this milestone.
+The React frontend now uses these same endpoints for submission, progress and inventory.
 
 | Endpoint | Behavior |
 | --- | --- |
@@ -364,8 +365,7 @@ $headers = @{ Authorization = "Bearer $token" }
 Invoke-RestMethod 'http://127.0.0.1:3001/api/audits' -Headers $headers
 ```
 
-Remove the variables when finished. No browser token storage or login form has
-been added; the frontend still checks the public GET /api/health endpoint.
+Remove the variables when finished. The frontend connection form accepts this token in memory; disconnecting or reloading clears it. GET /api/health remains public.
 
 ### Access-control boundary
 
@@ -429,3 +429,99 @@ References: [Node cryptographic random bytes and hashing](https://nodejs.org/api
 [Fastify logging and redaction](https://fastify.dev/docs/latest/Reference/Logging/),
 [OAuth bearer-token usage](https://www.rfc-editor.org/rfc/rfc6750.html), and
 [OpenID Connect](https://openid.net/specs/openid-connect-core-1_0.html).
+
+## Frontend workflow (milestone 5)
+
+1. Set `AUDIT_APPROVED_HOSTS` to the exact page and image hosts you intend to audit
+   in **both** the API and worker terminals. The default empty allowlist rejects
+   every target. See the persistent-jobs setup above for PowerShell examples.
+2. Run `npm run dev` (API + web) and, in a separate terminal with the same database
+   and host settings, `npm run dev:worker`.
+3. Run `npm run auth:token -- your-user-id` against the same database. Enter the
+   printed token on the connection screen at http://127.0.0.1:5173.
+4. Submit one approved HTTP/HTTPS webpage. Select a recent audit to see progress,
+   then the summary and candidate inventory. Refresh the recent list to discover
+   jobs created elsewhere while no listed jobs are active.
+5. Use the failed-resource, oversized-image, and missing-alt filters. JSON exports
+   the full audit result; CSV exports all inventory rows, regardless of the filter.
+
+Tokens live only in React memory: no local/session storage or cookies. Reloading
+or disconnecting clears the session and removes job data from the screen. Requests
+use bearer headers, a 10-second deadline, and reject redirects. An uncertain
+submission retains its idempotency key when retrying the same URL.
+
+Recent jobs and the selected detail poll sequentially every 1.5 seconds only
+while their last snapshot contains active jobs. Terminal jobs stop automatically.
+Closing details, switching jobs, or disconnecting aborts pending work and ignores
+late responses. Request errors pause polling and provide an explicit retry control.
+
+The summary counts unique resources separately from HTML image occurrences.
+The table has one row per candidate (or one placeholder for an occurrence without
+a source), retaining each occurrence's alt text. Responsive/lazy candidates are
+possibilities, not proof of browser selection. Empty alt may be decorative;
+missing alt is a review issue. No accessibility-compliance claim is made.
+Skipped URLs, partial coverage and lower-bound byte sizes remain visible.
+No remote image thumbnails are fetched by the browser.
+
+CSV uses quoted cells with escaped quotes and prefixes formula-like cells with
+an apostrophe, including formulas behind whitespace/control characters. Exported
+JSON preserves the original data. Exports may contain page-provided text and URLs.
+
+### Browser verification
+
+Install the test browser once, then run the complete checks:
+
+```sh
+npx playwright install chromium
+npm run check:all
+```
+
+`npm run check` runs Node tests, strict type checks and production builds.
+`npm run test:ui` runs Playwright Chromium tests. The browser suite uses dedicated
+loopback ports **4173, 3101 and 3102**; stop a running preview on 4173 first.
+It starts an isolated Vite frontend, a real Fastify API, a temporary SQLite
+database and a separate worker against local HTTP fixtures. Its deterministic
+test token is accepted only by that disposable database. It never uses your
+demo database or personal token.
+
+The real workflow test covers submit-to-results, duplicate resources, alt
+semantics, partial failures, filters, downloads and mobile overflow. Additional
+browser tests cover active/terminal polling, stale responses, component cleanup,
+authentication/input errors, retries, empty results, and disconnect/reload.
+Screenshots of fixture results are written under ignored `test-results/`.
+Traces, videos and automatic screenshots are disabled so normal test runs do
+not capture entered credentials. Chromium is the verified browser; no claim is
+made about other browsers or assistive-technology testing.
+
+Implementation references:
+[React effect cleanup](https://react.dev/reference/react/useEffect),
+[Playwright web servers](https://playwright.dev/docs/test-webserver), and
+[Playwright assertions](https://playwright.dev/docs/test-assertions).
+
+## Local environment file
+
+API, worker, migration and token-provisioning npm commands automatically load
+an optional `.env` from the repository root using Node's native
+[`--env-file-if-exists`](https://nodejs.org/api/cli.html#--env-file-if-existsfile).
+No additional dependency is needed. Tests do not load this file.
+
+Copy `.env.example` to `.env` once (do not overwrite an existing local file),
+then set your explicitly approved hosts, for example:
+
+```dotenv
+AUDIT_APPROVED_HOSTS=cnbible.com,www.cnbible.com
+AUDIT_DB_PATH=data/audits.sqlite
+```
+
+Run `npm run dev` and `npm run dev:worker` in separate terminals as before;
+there is no need to set PowerShell variables in each terminal. Restart both
+commands after changing `.env`, including in watch mode. Existing shell
+variables take precedence over file values; use fresh terminals or remove
+previous AUDIT_APPROVED_HOSTS/AUDIT_DB_PATH shell overrides when switching.
+Missing `.env` is allowed; without shell overrides the default allowlist is
+empty (deny all), and the database path is data/audits.sqlite.
+
+`.env.example` is safe to commit; `.env` and SQLite files remain Git-ignored.
+Keep bearer tokens out of both files and never use a VITE_ prefix for secrets,
+since Vite exposes prefixed values to browser code. The web app does not need
+these server settings in its bundle.

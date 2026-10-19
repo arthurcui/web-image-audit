@@ -10,7 +10,7 @@
 
 Verified on Node 26.8.2 / npm 11.19.1. Browser interactions and Node 24 were not
 verified.
-Milestone 2 was merged via PR #1. Milestone 3 is on feat/persistent-audit-jobs.
+Milestones 2–4 were merged via PRs #1–#3. Milestone 5 is on feat/audit-frontend.
 
 ## Milestone 2 — static audit engine
 
@@ -55,11 +55,22 @@ Milestone 3 verification used Node 26.8.2 / npm 11.19.1, temporary local SQLite 
 - [x] Demo limitations and external OIDC/OAuth integration documented.
 - [x] Final verification: 37 tests passed; strict type checks and API/frontend builds passed; git diff --check passed.
 
+## Milestone 5 — frontend workflow
+
+- [x] Memory-only token connection and disconnect, authenticated URL submission.
+- [x] Recent jobs and details with cancellable active-only polling and stale-response guards.
+- [x] Candidate inventory, distinct resource/occurrence counts, alt semantics and coverage notices.
+- [x] Filters, full JSON/CSV exports and spreadsheet-formula neutralization.
+- [x] Responsive layout, labelled controls, keyboard navigation and no remote previews.
+- [x] Isolated real API/SQLite/separate-worker browser fixture and behavioral tests.
+- [x] Final verification: 39 Node tests and 6 Chromium tests passed; strict type checks and both builds passed. Desktop/mobile screenshots inspected; keyboard connection and table scrolling verified; git diff --check passed.
+
 ## Later milestones — not implemented
 
-- [ ] Frontend audit submission and persisted inventory UI.
 - [ ] Official MCP TypeScript SDK entry point using shared application services.
 - [ ] GitHub Actions checks required for PR merge.
 
-Stop after milestone 4 verification. No commit, push, PR creation, or deployment
+Stop after milestone 5 verification. No commit, push, PR creation, or deployment
 for this milestone unless requested.
+
+- [x] Follow-up: native optional .env loading for API, worker, migration and token CLI; safe .env.example and ignored local configuration.

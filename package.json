@@ -8,18 +8,20 @@
   },
   "scripts": {
     "dev": "concurrently --kill-others --names api,web \"npm:dev:api\" \"npm:dev:web\"",
-    "dev:api": "tsx watch src/api/main.ts",
+    "dev:api": "node --env-file-if-exists=.env --import tsx --watch src/api/main.ts",
     "dev:web": "vite",
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json && tsc -p tsconfig.tools.json",
     "build": "npm run typecheck && tsc -p tsconfig.server.json && vite build",
-    "start:api": "node dist/server/api/main.js",
+    "start:api": "node --env-file-if-exists=.env dist/server/api/main.js",
     "preview": "vite preview",
     "test": "tsx --test tests/*.test.ts",
     "check": "npm test && npm run build",
-    "dev:worker": "tsx watch src/worker/main.ts",
-    "start:worker": "node dist/server/worker/main.js",
-    "db:migrate": "tsx src/infrastructure/migrate.ts",
-    "auth:token": "tsx src/infrastructure/provision-token.ts"
+    "dev:worker": "node --env-file-if-exists=.env --import tsx --watch src/worker/main.ts",
+    "start:worker": "node --env-file-if-exists=.env dist/server/worker/main.js",
+    "db:migrate": "node --env-file-if-exists=.env --import tsx src/infrastructure/migrate.ts",
+    "auth:token": "node --env-file-if-exists=.env --import tsx src/infrastructure/provision-token.ts",
+    "test:ui": "playwright test",
+    "check:all": "npm run check && npm run test:ui"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",
@@ -29,6 +31,7 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
