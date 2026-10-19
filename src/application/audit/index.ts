@@ -33,7 +33,7 @@ function metadata(result: FetchResult): FetchResult {
 }
 
 /** Fetch exactly one document and inspect its static image candidates; never crawl links. */
-export async function auditPage(pageUrl: string, options: AuditOptions): Promise<AuditResult> {
+export async function auditPage(pageUrl: string, options: AuditOptions, hooks: { onProgress?: (progress: { inspected: number; total: number }) => void } = {}): Promise<AuditResult> {
   const limits = getLimits(options);
   const policy = createUrlPolicy(options.approvedHosts);
   const fetchResource = createFetcher(policy, limits);
@@ -81,12 +81,15 @@ export async function auditPage(pageUrl: string, options: AuditOptions): Promise
     }
   }
   result.resources = [...resources.values()];
+  let inspectedCount = 0;
+  hooks.onProgress?.({ inspected: 0, total: result.resources.length });
   let next = 0;
   async function worker() {
     while (next < result.resources.length) {
       const resource = result.resources[next++]!;
       const inspected = await fetchResource(resource.requestedUrl);
       Object.assign(resource, metadata(inspected), { oversized: inspected.bytes > limits.oversizedBytes });
+      hooks.onProgress?.({ inspected: ++inspectedCount, total: result.resources.length });
     }
   }
   await Promise.all(Array.from({ length: Math.min(limits.concurrency, resources.size) }, worker));

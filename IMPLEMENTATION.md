@@ -1,6 +1,6 @@
 # Implementation checklist
 
-## Milestone 1 — complete
+## Milestone 1 — initial scaffold
 
 - [x] Empty-directory inspection; compact architecture and setup documentation.
 - [x] Strict TypeScript, React/Vite, Fastify health endpoint and status UI.
@@ -9,8 +9,8 @@
 - [x] Live API, Vite proxy, and HTML returned HTTP 200.
 
 Verified on Node 26.8.2 / npm 11.19.1. Browser interactions and Node 24 were not
-verified. Initial scaffold was committed and pushed at the user's request.
-Main now requires PRs; milestone 2 work is on feat/static-image-audit.
+verified.
+Milestone 2 was merged via PR #1. Milestone 3 is on feat/persistent-audit-jobs.
 
 ## Milestone 2 — static audit engine
 
@@ -28,13 +28,26 @@ Main now requires PRs; milestone 2 work is on feat/static-image-audit.
 
 Verification ran with Node 26.8.2 / npm 11.19.1. Engine network tests used only local HTTP fixtures; no external site audit or browser-rendering coverage is claimed. Git diff whitespace checks passed.
 
+
+## Milestone 3 — persistent jobs and worker
+
+- [x] Versioned SQLite migrations, WAL, indexes, bound parameters.
+- [x] POST/status/results/recent APIs with consistent errors and input validation.
+- [x] Atomic idempotency with conflicting-payload detection.
+- [x] Separate worker, atomic claims, leases, heartbeats, bounded retries.
+- [x] Expiry/token-fenced progress and atomic result publication.
+- [x] Crash recovery, attempt failure history, graceful drain and database cleanup.
+- [x] Local fixture, independent-process concurrency, and API tests.
+- [x] Final verification: 31 tests passed, including two real worker entry points; all strict type checks, production builds, and tracked-diff whitespace checks passed.
+- [x] Setup, consistency model, and trade-offs documented.
+
+Milestone 3 verification used Node 26.8.2 / npm 11.19.1, temporary local SQLite files, and loopback HTTP fixtures. OS power-loss durability, every platform signal path, and Node 24 were not exercised.
+
 ## Later milestones — not implemented
 
-- [ ] SQLite schema, migrations, repositories, and persistent job queue.
-- [ ] Separate worker with claims, leases, retries, and crash recovery.
-- [ ] Audit submission/result routes and persisted inventory UI.
+- [ ] Frontend audit submission and persisted inventory UI.
 - [ ] Official MCP TypeScript SDK entry point using shared application services.
 - [ ] GitHub Actions checks required for PR merge.
 
-Stop after milestone 2 verification. No commit, push, PR creation, or deployment
+Stop after milestone 3 verification. No commit, push, PR creation, or deployment
 for this milestone unless requested.

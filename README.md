@@ -4,9 +4,9 @@ A local-first portfolio project: submit one webpage URL, audit its images in the
 background, and inspect issues and an image inventory. An MCP interface is planned
 for the same workflow.
 
-**Milestone 2 adds a reusable static image-audit engine.** The React UI and API
-still expose only milestone 1's connection check. SQLite, the queue, worker,
-audit routes, inventory UI, and MCP tools are not implemented.
+**Milestone 3 adds persistent SQLite jobs, audit API routes, and a separate worker.**
+The reusable static audit engine remains independent of routes and persistence.
+The React UI still shows the connection check; inventory UI and MCP are deferred.
 
 ## Run locally
 
@@ -41,6 +41,8 @@ To test failure/recovery, run only `npm run dev:web`, then start
 | `npm run build` | Type-check, emit Node ESM, bundle frontend |
 | `npm run check` | Tests plus complete build/type checks |
 | `npm run start:api` | Run compiled API after build |
+| `npm run dev:worker` / `npm run start:worker` | Separate development / compiled worker |
+| `npm run db:migrate` | Apply SQLite migrations |
 | `npm run preview` | Preview built UI at http://127.0.0.1:4173 |
 
 For built-artifact verification, run `npm run build`, then `npm run start:api`
@@ -64,19 +66,19 @@ src/
       fetch.ts         Bounded HTTP transport, retries, shared request cache
       discover.ts      Cheerio parsing and srcset candidate discovery
   shared/              Browser-safe health contract
-  infrastructure/      Reserved: SQLite repositories and persistent queue
-  worker/              Reserved: separate job-consumer entry point
+  infrastructure/      SQLite migrations and fenced persistent job store
+  worker/              Separate consumer entry point and testable runner
   mcp/                 Reserved: official MCP TypeScript SDK entry point
 tests/                 API tests and ephemeral loopback HTTP fixtures
 dist/                  Generated builds (ignored)
-data/                  Future SQLite runtime files (ignored)
+data/                  SQLite runtime files and sidecars (ignored)
 ```
 
 The audit module depends on Node HTTP and Cheerio, with no imports from routes,
 the database, or UI. Planned flow: React → API → application services → SQLite;
 MCP → the same services; worker → SQLite queue → audit engine → stored results.
-Queue claims, leases, retry scheduling, crash recovery, and persistence belong to
-later milestones. No browser or agent framework is involved.
+Queue claims, leases, retries, crash recovery, and persistence are implemented.
+The frontend submission flow and MCP adapter remain future work.
 
 Node uses native ESM with NodeNext resolution; the frontend uses bundler
 resolution. Both inherit strict checking, checked indexing, and exact optional
@@ -150,7 +152,7 @@ and selected transient connection errors retry. Other HTTP failures, TLS errors,
 policy failures, and byte limits do not. Retry-After seconds/dates establish a
 minimum wait; long or invalid values defer the resource rather than being clamped
 to an earlier retry. Exhausted retries return a failure. Deferred results are
-reported only—there is no background scheduler yet.
+reported by the engine; the worker separately schedules eligible page-level job retries.
 
 Limits apply per attempt and per audit, not as a shared service-wide rate limit.
 Redirects and retries can cause more requests than maxImages. Each attempt has
@@ -189,7 +191,7 @@ img fallback are outside the occurrence model. Static findings do not claim
 complete accessibility compliance; human review remains necessary.
 
 Dependencies are pinned with a lockfile: Fastify 5, React 19, Vite 8,
-TypeScript 7, and Cheerio 1.2. SQLite and the official MCP SDK are deferred.
+TypeScript 7, Cheerio 1.2, and better-sqlite3 13. The official MCP SDK is deferred.
 Secrets, generated builds, dependencies, SQLite files, and sidecars are ignored.
 
 ## Official references
@@ -204,3 +206,118 @@ Secrets, generated builds, dependencies, SQLite files, and sidecars are ignored.
 - [Official MCP SDKs](https://modelcontextprotocol.io/docs/sdk)
 
 See [IMPLEMENTATION.md](IMPLEMENTATION.md) for milestone verification.
+
+## Persistent jobs and worker (milestone 3)
+
+The API and worker open the same local SQLite file, defaulting to
+`data/audits.sqlite` relative to their working directory. Use the project directory
+in both terminals, or set the same absolute `AUDIT_DB_PATH`. Keep the database
+on a local disk, outside OneDrive or network shares. It and its WAL/SHM sidecars
+are ignored by Git.
+
+In **each** PowerShell terminal, configure the explicitly approved page and
+image hosts before starting the process:
+
+```powershell
+cd C:\SideProjects\web-image-audit
+$env:AUDIT_DB_PATH = 'C:\SideProjects\web-image-audit\data\audits.sqlite'
+$env:AUDIT_APPROVED_HOSTS = 'example.com,images.example.com'
+```
+
+Use real target hosts you trust; this list is illustrative. It is empty by default,
+so requests are denied until configured. Clients cannot submit their own allowlist.
+Worker execution revalidates the target against the worker's current configuration.
+
+Terminal 1: `npm run dev` (API + frontend). Terminal 2: `npm run dev:worker`.
+After building, use `npm run start:api` and `npm run start:worker` instead.
+`npm run db:migrate` explicitly initializes/upgrades the database. Both processes
+also apply pending migrations on startup under a write transaction; future schema
+versions are rejected. No external queue is used.
+
+Create and inspect a job (PowerShell):
+
+```powershell
+$job = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3001/api/audits' -ContentType 'application/json' -Headers @{ 'Idempotency-Key' = 'demo-001' } -Body '{"url":"https://example.com/"}'
+Invoke-RestMethod ("http://127.0.0.1:3001" + $job.statusUrl)
+Invoke-RestMethod ("http://127.0.0.1:3001" + $job.resultsUrl)
+Invoke-RestMethod 'http://127.0.0.1:3001/api/audits?limit=20'
+```
+
+The React page remains a connection check; a submission form and inventory UI
+are not included in this milestone.
+
+| Endpoint | Behavior |
+| --- | --- |
+| POST /api/audits | JSON `{"url":"https://..."}`; returns 202 with id, state, statusUrl, resultsUrl, replayed, and Location |
+| GET /api/audits/:id | Current state, real progress, attempt counts, timestamps, lease expiry and lastError; no lease token |
+| GET /api/audits/:id/results | 200 with state, available, result (or null), and attempt history |
+| GET /api/audits?limit=20 | Recent jobs, newest first; limit 1–100, default 20; excludes result bodies |
+
+Unknown properties, malformed JSON/URLs/IDs, and unapproved targets are rejected.
+Errors use `{"error":{"code":"...","message":"..."}}`: 400 invalid input, 404
+missing job, 409 idempotency conflict, 413 oversized body, 415 unsupported media,
+503 database busy (Retry-After: 1), or 500 unexpected failure. Body size is 8 KiB;
+URL length is at most 2048 characters. There is no authentication or multi-tenant
+isolation; this is a loopback-only local demo.
+
+Idempotency-Key is optional, 1–128 letters/digits/dot/underscore/colon/hyphen.
+The validated payload has only a URL, canonicalized by URL parsing with its
+fragment removed. The same key and canonical URL return the existing job—even
+after completion—with 202 and replayed=true. Another canonical URL returns 409.
+The unique key and lookup/insert transaction prevent racing callers from creating
+duplicates. Without a key, each POST creates a job. Keys persist for the database
+lifetime; no retention/deletion endpoint exists yet.
+
+### Consistency model
+
+- States are queued, running, completed, failed. A completed audit can contain
+  failed or skipped image resources. Failed means no successful page audit could
+  be produced. A terminal page failure may still expose its diagnostic result.
+- Each worker handles one job at a time. A short BEGIN IMMEDIATE transaction
+  recovers up to 100 expired leases and claims one eligible job with a new random
+  fencing token. SQLite serializes writers; only one claimant can win.
+- Leases last 30 seconds, renewed every 5 seconds. Every heartbeat, progress,
+  completion, and failure write requires the token AND an unexpired lease.
+  An expired worker cannot renew itself or overwrite its replacement, even if
+  recovery has not yet occurred. Times are read after obtaining the write lock.
+- Three claims total are allowed, including attempts lost to crashes. Expired
+  jobs are recovered on worker polling, so status may remain running until a
+  worker polls again. Each attempt records its outcome and failure details.
+- Recoverable page/worker failures requeue with 1s then 2s delay. Page Retry-After
+  takes precedence; delays beyond one day fail rather than retry too early.
+  Permanent page failures do not retry. Image failures do not trigger job retries.
+- Progress reports fetching-page, then inspected/total image resources. Until
+  discovery completes, total is null. Progress resets on retry. Results are not
+  streamed: final JSON and terminal state publish in the same fenced transaction.
+  Retry clears unpublished/obsolete result state. A read transaction returns a
+  consistent result/status/attempt-history snapshot.
+- Network I/O and result serialization occur outside write transactions. Queries
+  use bound parameters; indexes cover queued claims, expired leases, recent jobs,
+  and unique idempotency keys. SQLite uses WAL, synchronous=FULL, and a 1s busy timeout.
+
+Execution is **at least once**, not exactly once: after a crash an image may be
+downloaded again. Fencing gives a single accepted terminal publication, not
+exactly-once network effects. A worker that loses its lease may finish in-flight
+network work, but its writes are rejected. A stalled event loop can miss heartbeats;
+fencing preserves correctness at the cost of extra work.
+
+SIGINT/SIGTERM stops new claims and drains the current bounded audit while
+continuing heartbeats, then closes the database. The API stops accepting work and
+closes its connection after active requests finish. A forced kill relies on lease
+expiry; draining can take as long as the engine's bounded requests/retries.
+Synchronous SQLite briefly blocks each process's event loop. This is appropriate
+for the small local demo, not a horizontally distributed queue. All processes
+must share the same host clock and local database. Wall-clock jumps can affect
+lease timing. Snapshot JSON avoids a large relational result schema but has
+write/read amplification; there is no result pagination or database retention yet.
+
+Tests use temporary SQLite files, competing child processes, controlled clocks,
+and local HTTP fixtures. They cover race-free claims/idempotency, process-exit
+recovery, expired and replaced lease writes, bounded retries, result replacement,
+persistence across reopen, real worker processes, API validation, and graceful
+worker draining. They do not simulate OS power loss or verify every OS signal path.
+
+Official references: [better-sqlite3 transactions and parameters](https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md),
+[SQLite transactions](https://www.sqlite.org/lang_transaction.html),
+[WAL](https://www.sqlite.org/wal.html), and
+[Fastify validation](https://fastify.dev/docs/latest/Reference/Validation-and-Serialization/).

@@ -1,2 +1,1 @@
-Reserved for the separate worker entry point. Not implemented in milestone 1.
-The worker will claim durable SQLite jobs and invoke application services.
+main.ts runs the separate worker; runner.ts owns claims, heartbeats, progress, retries, and graceful draining. See the root README for configuration and consistency guarantees.
