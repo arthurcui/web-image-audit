@@ -8,13 +8,13 @@ import type { Attempt, Claim, Failure, Job, JobStore, Progress } from '../applic
 import type { AuditResult } from '../application/audit/types.js';
 
 interface Row {
-  id: string; url: string; state: Job['state']; attempts: number; max_attempts: number;
+  id: string; owner_id: string; url: string; state: Job['state']; attempts: number; max_attempts: number;
   created_at: number; updated_at: number; available_at: number; lease_until: number | null;
   progress_json: string; last_error_json: string | null; result_json: string | null;
 }
 const queued: Progress = { phase: 'queued', inspected: 0, total: null };
 function job(row: Row): Job {
-  return { id: row.id, url: row.url, state: row.state, attempts: row.attempts,
+  return { id: row.id, ownerId: row.owner_id, url: row.url, state: row.state, attempts: row.attempts,
     maxAttempts: row.max_attempts, createdAt: row.created_at, updatedAt: row.updated_at,
     availableAt: row.available_at, leaseUntil: row.lease_until,
     progress: JSON.parse(row.progress_json) as Progress,
@@ -35,16 +35,29 @@ export class SqliteJobStore implements JobStore {
     } catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
-  private row(id: string) { return this.db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as Row | undefined; }
-  get(id: string) { const row = this.row(id); return row ? job(row) : undefined; }
-  list(limit: number) {
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('limit must be 1..100');
-    return (this.db.prepare('SELECT * FROM jobs ORDER BY created_at DESC, id DESC LIMIT ?').all(limit) as Row[]).map(job);
+  saveToken(hash: string, userId: string) {
+    this.db.prepare('INSERT INTO bearer_tokens(token_hash,user_id,created_at) VALUES (?,?,?)').run(hash, userId, this.now());
   }
-  results(id: string) {
+  tokenUser(hash: string) {
+    return (this.db.prepare('SELECT user_id FROM bearer_tokens WHERE token_hash=?').get(hash) as { user_id: string } | undefined)?.user_id;
+  }
+  // Unscoped access is internal to the trusted worker/admin repository, never a public transport API.
+  private row(id: string, ownerId?: string) {
+    return (ownerId === undefined
+      ? this.db.prepare('SELECT * FROM jobs WHERE id=?').get(id)
+      : this.db.prepare('SELECT * FROM jobs WHERE id=? AND owner_id=?').get(id, ownerId)) as Row | undefined;
+  }
+  get(id: string, ownerId?: string) { const row = this.row(id, ownerId); return row ? job(row) : undefined; }
+  list(limit: number, ownerId?: string) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('limit must be 1..100');
+    return ((ownerId === undefined
+      ? this.db.prepare('SELECT * FROM jobs ORDER BY created_at DESC,id DESC LIMIT ?').all(limit)
+      : this.db.prepare('SELECT * FROM jobs WHERE owner_id=? ORDER BY created_at DESC,id DESC LIMIT ?').all(ownerId, limit)) as Row[]).map(job);
+  }
+  results(id: string, ownerId?: string) {
     // One read transaction supplies a consistent status/result/history snapshot.
     return this.db.transaction(() => {
-      const row = this.row(id);
+      const row = this.row(id, ownerId);
       if (!row) return undefined;
       const attempts = (this.db.prepare(
         'SELECT attempt, started_at, ended_at, outcome, failure_json FROM job_attempts WHERE job_id = ? ORDER BY attempt',
@@ -54,10 +67,11 @@ export class SqliteJobStore implements JobStore {
       return { job: job(row), result: row.result_json ? JSON.parse(row.result_json) as AuditResult : null, attempts };
     })();
   }
-  create(url: string, key?: string) {
+  create(url: string, key?: string, ownerId = '__legacy__') {
+    const scopedKey = key === undefined ? undefined : JSON.stringify([ownerId, key]);
     return this.db.transaction(() => {
       if (key !== undefined) {
-        const existing = this.db.prepare('SELECT * FROM jobs WHERE idempotency_key = ?').get(key) as Row | undefined;
+        const existing = this.db.prepare('SELECT * FROM jobs WHERE idempotency_key = ? AND owner_id = ?').get(scopedKey!, ownerId) as Row | undefined;
         if (existing) {
           if (existing.url !== url) throw new JobError(409, 'idempotency_conflict', 'Idempotency-Key already belongs to a different URL');
           return { job: job(existing), replayed: true };
@@ -66,8 +80,8 @@ export class SqliteJobStore implements JobStore {
       const id = randomUUID();
       const now = this.now();
       this.db.prepare(`INSERT INTO jobs
-        (id,url,idempotency_key,state,max_attempts,created_at,updated_at,available_at,progress_json)
-        VALUES (?,?,?,'queued',3,?,?,?,?)`).run(id, url, key ?? null, now, now, now, JSON.stringify(queued));
+        (id,url,idempotency_key,state,max_attempts,created_at,updated_at,available_at,progress_json,owner_id)
+        VALUES (?,?,?,'queued',3,?,?,?,?,?)`).run(id, url, scopedKey ?? null, now, now, now, JSON.stringify(queued), ownerId);
       return { job: this.get(id)!, replayed: false };
     }).immediate();
   }

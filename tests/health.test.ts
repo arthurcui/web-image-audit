@@ -13,11 +13,11 @@ test('health endpoint returns the public JSON contract', async (t) => {
   assert.ok(isHealthResponse(response.json()));
 });
 
-test('audit submission denies targets when no hosts are approved', async (t) => {
+test('audit submission requires authentication', async (t) => {
   const app = buildApp();
   t.after(() => app.close());
   const response = await app.inject({ method: 'POST', url: '/api/audits', payload: { url: 'https://example.com' } });
-  assert.equal(response.statusCode, 400);
+  assert.equal(response.statusCode, 401);
 });
 
 test('browser contract validation rejects malformed responses', () => {

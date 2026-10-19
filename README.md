@@ -4,7 +4,7 @@ A local-first portfolio project: submit one webpage URL, audit its images in the
 background, and inspect issues and an image inventory. An MCP interface is planned
 for the same workflow.
 
-**Milestone 3 adds persistent SQLite jobs, audit API routes, and a separate worker.**
+**Milestone 4 adds demo bearer authentication and per-user audit ownership.**
 The reusable static audit engine remains independent of routes and persistence.
 The React UI still shows the connection check; inventory UI and MCP are deferred.
 
@@ -43,6 +43,7 @@ To test failure/recovery, run only `npm run dev:web`, then start
 | `npm run start:api` | Run compiled API after build |
 | `npm run dev:worker` / `npm run start:worker` | Separate development / compiled worker |
 | `npm run db:migrate` | Apply SQLite migrations |
+| `npm run auth:token -- <user-id>` | Provision a demo token and print it once |
 | `npm run preview` | Preview built UI at http://127.0.0.1:4173 |
 
 For built-artifact verification, run `npm run build`, then `npm run start:api`
@@ -58,6 +59,8 @@ src/
   api/                 Fastify app factory and HTTP entry point
   web/                 React + Vite connection-status UI
   application/
+    auth.ts            Demo authentication adapter and token provisioning
+    audit-service.ts   Shared authenticated ownership boundary for API/future MCP
     health.ts          API liveness service
     audit/
       index.ts         auditPage public interface and orchestration
@@ -234,13 +237,14 @@ After building, use `npm run start:api` and `npm run start:worker` instead.
 also apply pending migrations on startup under a write transaction; future schema
 versions are rejected. No external queue is used.
 
-Create and inspect a job (PowerShell):
+Create and inspect a job (PowerShell). First provision and load a token as shown
+in the authentication section below; $headers must contain its Authorization header:
 
 ```powershell
-$job = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3001/api/audits' -ContentType 'application/json' -Headers @{ 'Idempotency-Key' = 'demo-001' } -Body '{"url":"https://example.com/"}'
-Invoke-RestMethod ("http://127.0.0.1:3001" + $job.statusUrl)
-Invoke-RestMethod ("http://127.0.0.1:3001" + $job.resultsUrl)
-Invoke-RestMethod 'http://127.0.0.1:3001/api/audits?limit=20'
+$job = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3001/api/audits' -ContentType 'application/json' -Headers ($headers + @{ 'Idempotency-Key' = 'demo-001' }) -Body '{"url":"https://example.com/"}'
+Invoke-RestMethod ("http://127.0.0.1:3001" + $job.statusUrl) -Headers $headers
+Invoke-RestMethod ("http://127.0.0.1:3001" + $job.resultsUrl) -Headers $headers
+Invoke-RestMethod 'http://127.0.0.1:3001/api/audits?limit=20' -Headers $headers
 ```
 
 The React page remains a connection check; a submission form and inventory UI
@@ -257,14 +261,15 @@ Unknown properties, malformed JSON/URLs/IDs, and unapproved targets are rejected
 Errors use `{"error":{"code":"...","message":"..."}}`: 400 invalid input, 404
 missing job, 409 idempotency conflict, 413 oversized body, 415 unsupported media,
 503 database busy (Retry-After: 1), or 500 unexpected failure. Body size is 8 KiB;
-URL length is at most 2048 characters. There is no authentication or multi-tenant
-isolation; this is a loopback-only local demo.
+URL length is at most 2048 characters. Audit endpoints require demo bearer
+authentication (401); foreign and nonexistent jobs return the same 404. Disallowed
+browser origins return 403. This remains a loopback-only local demo.
 
 Idempotency-Key is optional, 1–128 letters/digits/dot/underscore/colon/hyphen.
 The validated payload has only a URL, canonicalized by URL parsing with its
-fragment removed. The same key and canonical URL return the existing job—even
+fragment removed. For the same authenticated user, the same key and canonical URL return the existing job—even
 after completion—with 202 and replayed=true. Another canonical URL returns 409.
-The unique key and lookup/insert transaction prevent racing callers from creating
+The user-scoped unique key and lookup/insert transaction prevent racing callers from creating
 duplicates. Without a key, each POST creates a job. Keys persist for the database
 lifetime; no retention/deletion endpoint exists yet.
 
@@ -321,3 +326,106 @@ Official references: [better-sqlite3 transactions and parameters](https://github
 [SQLite transactions](https://www.sqlite.org/lang_transaction.html),
 [WAL](https://www.sqlite.org/wal.html), and
 [Fastify validation](https://fastify.dev/docs/latest/Reference/Validation-and-Serialization/).
+
+## Demo authentication and ownership (milestone 4)
+
+This is **demo authentication**, not an OAuth server or a production identity
+system. A trusted local operator provisions random opaque bearer credentials
+mapped to a user ID. No custom OAuth flow, JWT issuance, signup, or password
+database is implemented.
+
+With the same AUDIT_DB_PATH as the API and worker, run:
+
+```powershell
+npm run auth:token -- arthurcui
+```
+
+The CLI writes one newly generated token line to stdout, once. Save it in a
+password manager; do not redirect it into the repository, commit it, or paste it
+into a URL. There is no retrieval command. Every invocation generates a distinct
+token; multiple tokens can map to the same user. User IDs are case-sensitive,
+start with a letter/digit, and contain at most 64 letters/digits/dots/underscores/
+hyphens. Provisioning is a privileged local command, not an unauthenticated API.
+
+Tokens contain 32 cryptographically random bytes (256 bits) encoded with a wia_
+prefix. SQLite stores only a SHA-256 digest, the mapped user ID, and creation
+time. Plaintext credentials are never stored in job rows, sent to audited sites,
+or included in request logs. Request serializers omit URLs, headers, and bodies;
+unexpected request errors use a fixed log message. The CLI's deliberate one-time
+stdout output is the only credential display. Protect terminal output and
+password-manager access. Environment files and databases/sidecars remain ignored.
+
+For API calls, load the token into memory without entering it in shell history:
+
+```powershell
+$secret = Read-Host 'Paste your audit token' -AsSecureString
+$token = [System.Net.NetworkCredential]::new('', $secret).Password
+$headers = @{ Authorization = "Bearer $token" }
+Invoke-RestMethod 'http://127.0.0.1:3001/api/audits' -Headers $headers
+```
+
+Remove the variables when finished. No browser token storage or login form has
+been added; the frontend still checks the public GET /api/health endpoint.
+
+### Access-control boundary
+
+`AuditService` in src/application/audit-service.ts authenticates every operation
+and derives the owner from a trusted authentication adapter. It does not accept a
+caller-supplied owner ID. API routes delegate create/list/get/results to this
+service. Future MCP tools must use this same service, not invoke the worker
+repository directly. Direct-service tests prove isolation independently of HTTP.
+
+Owner predicates are applied in SQLite queries before returning jobs, results,
+or attempt history, and before applying list limits. Idempotency keys are
+namespaced by owner as an unambiguous JSON tuple stored under the existing unique
+constraint; two users can use the same key without sharing jobs or conflicts.
+The worker and local database administration are privileged internals: their
+unscoped repository methods can process all users' jobs, but they are not exposed
+through routes or tools. Possession of the database or filesystem access is
+outside this API security boundary.
+
+Missing, malformed, or unknown credentials return a generic 401 with
+WWW-Authenticate: Bearer. A valid user requesting another user's job receives
+the same 404 body as a nonexistent job. Foreign URLs, result bodies, progress, and
+attempt errors are never returned. Audit responses use Cache-Control: no-store.
+
+API and Vite bind to 127.0.0.1. CORS allows only HTTP origins on 127.0.0.1 or
+localhost at ports 5173 and 4173. Preflight permits GET/POST and the Authorization,
+Content-Type, and Idempotency-Key headers. Other origins (including null) are
+rejected; no wildcard or cookie credential mode is enabled. CLI requests without
+Origin are supported but still need bearer authentication. CORS is a browser
+restriction, not a substitute for authorization or protection against local
+processes.
+
+### Existing databases
+
+Stop old API/worker processes before upgrading; they predate authorization.
+Migration 2 adds a non-null owner to every existing job and a token-hash table.
+Pre-auth jobs are assigned the reserved __legacy__ owner because their real owner
+cannot be inferred. That owner cannot receive a credential. Jobs/results are
+preserved for local administration but hidden from every authenticated user;
+there is no automatic adoption by the first user. Newly submitted audits use the
+authenticated user's ID. The migration preserves lease state and attempt history.
+
+### Production identity integration
+
+Replace the demo authentication adapter with a maintained external OIDC/OAuth
+provider integration. The provider handles user login, MFA, token issuance,
+expiry, and revocation. A resource-server adapter validates API access tokens
+using the provider's supported signature validation or introspection, checking
+issuer, audience, lifetime, and applicable permissions. Map the verified issuer
+and subject to a stable internal user ID, then retain the shared ownership checks.
+Do not treat an ID token or an unverified client-supplied user ID as API authority.
+Provider discovery/introspection may require an async authentication interface.
+
+Production would also need HTTPS, credential lifecycle management, rate limits,
+operational auditing without secrets, and appropriate tenant/role policy.
+Current demo tokens do not expire automatically; there is no revocation command
+or account lifecycle UI. Whoever holds a token can act as its user until its
+hash record is removed by trusted administration. This feature does not strengthen
+the audit engine's DNS/SSRF policy; its documented allowlist limitations remain.
+
+References: [Node cryptographic random bytes and hashing](https://nodejs.org/api/crypto.html),
+[Fastify logging and redaction](https://fastify.dev/docs/latest/Reference/Logging/),
+[OAuth bearer-token usage](https://www.rfc-editor.org/rfc/rfc6750.html), and
+[OpenID Connect](https://openid.net/specs/openid-connect-core-1_0.html).

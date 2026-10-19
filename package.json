@@ -18,7 +18,8 @@
     "check": "npm test && npm run build",
     "dev:worker": "tsx watch src/worker/main.ts",
     "start:worker": "node dist/server/worker/main.js",
-    "db:migrate": "tsx src/infrastructure/migrate.ts"
+    "db:migrate": "tsx src/infrastructure/migrate.ts",
+    "auth:token": "tsx src/infrastructure/provision-token.ts"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",

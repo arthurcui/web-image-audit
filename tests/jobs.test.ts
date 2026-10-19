@@ -1,3 +1,5 @@
+import type { InjectOptions } from 'fastify';
+import { provisionToken } from '../src/application/auth.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -197,7 +199,12 @@ test('API validates inputs, replays idempotency keys, and returns consistent err
   const store = db.open();
   const app = buildApp({ store, approvedHosts: ['example.com'] });
   t.after(() => app.close());
-  const create = (url: string, key = 'test-key') => app.inject({
+  const authorization = 'Bearer ' + provisionToken(store, 'fixture-user');
+  const inject = (input: string | InjectOptions) => {
+    const request = typeof input === 'string' ? { url: input } : input;
+    return app.inject({ ...request, headers: { ...request.headers, authorization } });
+  };
+  const create = (url: string, key = 'test-key') => inject({
     method: 'POST', url: '/api/audits', headers: { 'idempotency-key': key }, payload: { url },
   });
   const first = await create('https://example.com/');
@@ -208,26 +215,26 @@ test('API validates inputs, replays idempotency keys, and returns consistent err
   const conflict = await create('https://example.com/other');
   assert.equal(conflict.statusCode, 409);
   assert.equal(conflict.json<{ error: { code: string } }>().error.code, 'idempotency_conflict');
-  const status = await app.inject(body.statusUrl);
+  const status = await inject(body.statusUrl);
   assert.equal(status.json<{ state: string }>().state, 'queued');
   assert.ok(!status.body.includes('lease_token'));
-  assert.equal((await app.inject(body.resultsUrl)).json<{ available: boolean }>().available, false);
-  assert.equal((await app.inject('/api/audits?limit=1')).json<{ jobs: unknown[] }>().jobs.length, 1);
+  assert.equal((await inject(body.resultsUrl)).json<{ available: boolean }>().available, false);
+  assert.equal((await inject('/api/audits?limit=1')).json<{ jobs: unknown[] }>().jobs.length, 1);
   for (const response of [
     await create('https://not-approved.example/'),
     await create('https://user:password@example.com/'),
     await create('https://example.com/', 'bad key'),
-    await app.inject({ method: 'POST', url: '/api/audits', payload: {} }),
-    await app.inject({ method: 'POST', url: '/api/audits', payload: { url: 'https://example.com/', approvedHosts: ['evil.test'] } }),
-    await app.inject({ method: 'POST', url: '/api/audits', headers: { 'content-type': 'application/json' }, payload: '{broken' }),
-    await app.inject('/api/audits?limit=101'),
-    await app.inject('/api/audits/not-an-id'),
+    await inject({ method: 'POST', url: '/api/audits', payload: {} }),
+    await inject({ method: 'POST', url: '/api/audits', payload: { url: 'https://example.com/', approvedHosts: ['evil.test'] } }),
+    await inject({ method: 'POST', url: '/api/audits', headers: { 'content-type': 'application/json' }, payload: '{broken' }),
+    await inject('/api/audits?limit=101'),
+    await inject('/api/audits/not-an-id'),
   ]) {
     assert.equal(response.statusCode, 400);
     assert.equal(typeof response.json<{ error: { code: string } }>().error.code, 'string');
   }
-  assert.equal((await app.inject('/api/audits/' + randomUUID())).statusCode, 404);
-  assert.equal((await app.inject('/api/audits/' + randomUUID() + '/results')).statusCode, 404);
+  assert.equal((await inject('/api/audits/' + randomUUID())).statusCode, 404);
+  assert.equal((await inject('/api/audits/' + randomUUID() + '/results')).statusCode, 404);
 });
 
 test('real engine and worker publish partial-image audits as completed and page failures as failed', async (t) => {
@@ -245,11 +252,16 @@ test('real engine and worker publish partial-image audits as completed and page 
   const store = db.open();
   const app = buildApp({ store, approvedHosts: [new URL(origin).host] });
   t.after(() => app.close());
-  const created = await app.inject({ method: 'POST', url: '/api/audits', payload: { url: origin + '/page' } });
+  const authorization = 'Bearer ' + provisionToken(store, 'fixture-user');
+  const inject = (input: string | InjectOptions) => {
+    const request = typeof input === 'string' ? { url: input } : input;
+    return app.inject({ ...request, headers: { ...request.headers, authorization } });
+  };
+  const created = await inject({ method: 'POST', url: '/api/audits', payload: { url: origin + '/page' } });
   const id = created.json<{ id: string }>().id;
   const worker = new AuditWorker(store, { auditOptions: { approvedHosts: [new URL(origin).host], maxRetries: 0 } });
   await worker.runOnce();
-  const result = (await app.inject('/api/audits/' + id + '/results')).json<{ state: string; result: AuditResult }>();
+  const result = (await inject('/api/audits/' + id + '/results')).json<{ state: string; result: AuditResult }>();
   assert.equal(result.state, 'completed');
   assert.equal(result.result.resources[0]!.state, 'failed');
   assert.equal(result.result.resources[1]!.state, 'ok');
