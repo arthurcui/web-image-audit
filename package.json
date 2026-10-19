@@ -18,6 +18,7 @@
     "check": "npm test && npm run build"
   },
   "dependencies": {
+    "cheerio": "1.2.0",
     "fastify": "5.12.7",
     "react": "19.3.1",
     "react-dom": "19.3.1"
