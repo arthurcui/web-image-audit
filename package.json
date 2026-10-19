@@ -15,15 +15,20 @@
     "start:api": "node dist/server/api/main.js",
     "preview": "vite preview",
     "test": "tsx --test tests/*.test.ts",
-    "check": "npm test && npm run build"
+    "check": "npm test && npm run build",
+    "dev:worker": "tsx watch src/worker/main.ts",
+    "start:worker": "node dist/server/worker/main.js",
+    "db:migrate": "tsx src/infrastructure/migrate.ts"
   },
   "dependencies": {
+    "better-sqlite3": "13.0.3",
     "cheerio": "1.2.0",
     "fastify": "5.12.7",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "9.6.0",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
