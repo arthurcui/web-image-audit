@@ -43,11 +43,23 @@ Verification ran with Node 26.8.2 / npm 11.19.1. Engine network tests used only 
 
 Milestone 3 verification used Node 26.8.2 / npm 11.19.1, temporary local SQLite files, and loopback HTTP fixtures. OS power-loss durability, every platform signal path, and Node 24 were not exercised.
 
+
+## Milestone 4 — ownership and demo authentication
+
+- [x] Opaque random bearer credentials, hash-only SQLite storage, one-time CLI output.
+- [x] Shared authenticated application service with owner-filtered reads and creation.
+- [x] Owner-scoped idempotency, consistent 401 and indistinguishable foreign/missing 404.
+- [x] Non-null ownership migration; legacy jobs retained under inaccessible reserved owner.
+- [x] Exact local frontend CORS policy and credential-safe request logging.
+- [x] Service/API user-isolation, token CLI/storage/logging, migration, and CORS tests.
+- [x] Demo limitations and external OIDC/OAuth integration documented.
+- [x] Final verification: 37 tests passed; strict type checks and API/frontend builds passed; git diff --check passed.
+
 ## Later milestones — not implemented
 
 - [ ] Frontend audit submission and persisted inventory UI.
 - [ ] Official MCP TypeScript SDK entry point using shared application services.
 - [ ] GitHub Actions checks required for PR merge.
 
-Stop after milestone 3 verification. No commit, push, PR creation, or deployment
+Stop after milestone 4 verification. No commit, push, PR creation, or deployment
 for this milestone unless requested.

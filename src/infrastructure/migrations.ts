@@ -26,6 +26,20 @@ const migrations = [{
       PRIMARY KEY(job_id, attempt)
     ) STRICT;
   `,
+}, {
+  version: 2,
+  sql: `
+    ALTER TABLE jobs ADD COLUMN owner_id TEXT NOT NULL DEFAULT '__legacy__';
+    UPDATE jobs SET idempotency_key = json_array('__legacy__', idempotency_key)
+      WHERE idempotency_key IS NOT NULL;
+    CREATE INDEX jobs_owner_recent ON jobs(owner_id, created_at DESC, id DESC);
+    CREATE TABLE bearer_tokens (
+      token_hash TEXT PRIMARY KEY CHECK(length(token_hash)=64),
+      user_id TEXT NOT NULL CHECK(user_id != '__legacy__'),
+      created_at INTEGER NOT NULL
+    ) STRICT;
+    CREATE INDEX bearer_tokens_user ON bearer_tokens(user_id);
+  `,
 }];
 
 export function migrate(db: Database.Database) {
