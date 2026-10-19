@@ -1,0 +1,35 @@
+{
+  "name": "website-image-audit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^24.0.0 || ^26.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others --names api,web \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "tsx watch src/api/main.ts",
+    "dev:web": "vite",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json && tsc -p tsconfig.tools.json",
+    "build": "npm run typecheck && tsc -p tsconfig.server.json && vite build",
+    "start:api": "node dist/server/api/main.js",
+    "preview": "vite preview",
+    "test": "tsx --test tests/*.test.ts",
+    "check": "npm test && npm run build"
+  },
+  "dependencies": {
+    "fastify": "5.12.7",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "concurrently": "10.0.6",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}
