@@ -34,3 +34,7 @@ footer{margin-top:28px;color:#52655b;font-size:12px;line-height:1.8}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:1000px){.workspace{grid-template-columns:1fr}.job-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}.job-list li+li{margin:0}}
 @media(max-width:600px){main{padding:20px 16px}.brand-name{display:none}.panel{padding:18px}.input-row{flex-direction:column}.intro{padding-top:28px}.actions{flex-wrap:wrap}.metrics{grid-template-columns:repeat(2,1fr)}}
+.mcp-chat{margin-top:24px}.chat-log{max-height:520px;overflow:auto;margin:20px 0;border-block:1px solid #dce2d9;overflow-wrap:anywhere}
+.chat-entry{padding:16px 0;border-bottom:1px solid #dce2d9}.chat-entry:last-child{border:0}.chat-entry p{margin:6px 0}
+.chat-entry details{margin:12px 0;font-size:13px}.chat-entry summary{cursor:pointer;color:#173e32;font-weight:600}
+.chat-entry pre{max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f5ef;padding:14px;border-radius:6px;font-size:12px}

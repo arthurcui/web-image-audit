@@ -10,7 +10,7 @@
 
 Verified on Node 26.8.2 / npm 11.19.1. Browser interactions and Node 24 were not
 verified.
-Milestones 2–4 were merged via PRs #1–#3. Milestone 5 is on feat/audit-frontend.
+Milestones 2–5 were merged via PRs #1–#4. Milestone 6 is on feat/mcp-server.
 
 ## Milestone 2 — static audit engine
 
@@ -65,12 +65,31 @@ Milestone 3 verification used Node 26.8.2 / npm 11.19.1, temporary local SQLite 
 - [x] Isolated real API/SQLite/separate-worker browser fixture and behavioral tests.
 - [x] Final verification: 39 Node tests and 6 Chromium tests passed; strict type checks and both builds passed. Desktop/mobile screenshots inspected; keyboard connection and table scrolling verified; git diff --check passed.
 
+## Milestone 6 — local MCP server
+
+- [x] Verified official v2 SDK docs and installed pinned server/client SDK 2.3.1.
+- [x] Stdio entry point with configured demo identity, shared service authorization and clean shutdown.
+- [x] Four validated tools, immediate queued job creation and user-scoped idempotency.
+- [x] Owner-filtered keyset job pagination and bounded result sections with explicit text truncation.
+- [x] Untrusted webpage data notices, no raw HTML/body output and no stdout logging.
+- [x] Protocol-client tests for workflow, ownership, schemas, pagination and credential-safe startup.
+- [x] Launch/client configuration, sample workflow, local-auth limitations and no-LLM-key setup documented.
+- [x] Final verification: 45 Node tests (including 6 MCP protocol tests), 6 Chromium tests, strict type checks and both builds passed. Compiled stdio handshake/tool-discovery/list smoke check and git diff --check passed.
+
 ## Later milestones — not implemented
 
-- [ ] Official MCP TypeScript SDK entry point using shared application services.
 - [ ] GitHub Actions checks required for PR merge.
 
-Stop after milestone 5 verification. No commit, push, PR creation, or deployment
+Stop after milestone 6 verification. No commit, push, PR creation, or deployment
 for this milestone unless requested.
 
 - [x] Follow-up: native optional .env loading for API, worker, migration and token CLI; safe .env.example and ignored local configuration.
+
+### Milestone 6 follow-up — scripted chat demonstration
+
+- [x] Labelled non-AI command parser with start/status/issues/list commands and visible tool traces.
+- [x] Authenticated HTTP bridge uses the official client and real short-lived stdio server processes.
+- [x] Strict tool allowlist, per-request identity, concurrency/deadline/output bounds and cleanup.
+- [x] In-memory chat, retry idempotency, pagination, disconnect cleanup and escaped untrusted text.
+- [x] Verified 47 Node tests and 8 Chromium tests; strict type checks and both builds passed.
+- [x] Final chat/bridge tests re-passed after polish; compiled API-to-compiled MCP smoke passed; screenshot inspected and diff whitespace checked.

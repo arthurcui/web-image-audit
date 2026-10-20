@@ -4,7 +4,7 @@ import { SqliteJobStore } from '../infrastructure/job-store.js';
 
 const config = readConfig();
 const store = new SqliteJobStore(config.databasePath);
-const app = buildApp({ logger: true, store, approvedHosts: config.approvedHosts });
+const app = buildApp({ logger: true, store, approvedHosts: config.approvedHosts, mcpDatabasePath: config.databasePath });
 app.addHook('onClose', async () => store.close());
 let closing = false;
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

@@ -1,6 +1,6 @@
 import type { Authenticator } from './auth.js';
 import { JobError } from './jobs.js';
-import type { JobStore } from './jobs.js';
+import type { JobCursor, JobStore } from './jobs.js';
 import { createUrlPolicy } from './audit/policy.js';
 
 /** Public application boundary. API/MCP must use this, not the trusted worker repository. */
@@ -36,9 +36,12 @@ export class AuditService {
     if (!result) throw new JobError(404, 'job_not_found', 'Audit job not found');
     return result;
   }
-  list(authorization: unknown, limit = 20) {
+  list(authorization: unknown, limit = 20, before?: JobCursor) {
     const userId = this.auth.authenticate(authorization);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new JobError(400, 'invalid_request', 'Limit must be 1–100');
-    return this.store.list(limit, userId);
+    if (before && (!Number.isSafeInteger(before.createdAt) || before.createdAt < 0 || !/^[0-9a-f-]{36}$/.test(before.id))) {
+      throw new JobError(400, 'invalid_request', 'Invalid pagination cursor');
+    }
+    return this.store.list(limit, userId, before);
   }
 }

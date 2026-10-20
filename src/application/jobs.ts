@@ -8,6 +8,7 @@ export interface Job {
   createdAt: number; updatedAt: number; availableAt: number; leaseUntil: number | null;
   progress: Progress; lastError: Failure | null;
 }
+export interface JobCursor { createdAt: number; id: string }
 export interface Claim { job: Job; token: string }
 export interface Attempt {
   attempt: number; startedAt: number; endedAt: number | null; outcome: string | null; failure: Failure | null;
@@ -18,7 +19,7 @@ export class JobError extends Error {
 export interface JobStore {
   create(url: string, key?: string, ownerId?: string): { job: Job; replayed: boolean };
   get(id: string, ownerId?: string): Job | undefined;
-  list(limit: number, ownerId?: string): Job[];
+  list(limit: number, ownerId?: string, before?: JobCursor): Job[];
   results(id: string, ownerId?: string): { job: Job; result: AuditResult | null; attempts: Attempt[] } | undefined;
   claim(leaseMs: number): Claim | undefined;
   heartbeat(claim: Claim, leaseMs: number): boolean;

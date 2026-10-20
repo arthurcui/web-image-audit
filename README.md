@@ -1,12 +1,12 @@
 # Website Image Audit
 
 A local-first portfolio project: submit one webpage URL, audit its images in the
-background, and inspect issues and an image inventory. An MCP interface is planned
+background, and inspect issues and an image inventory. An MCP interface is implemented
 for the same workflow.
 
-**Milestone 5 adds the authenticated React audit workflow and image inventory.**
+**Milestone 6 adds a local stdio MCP server using the official TypeScript SDK.**
 The reusable static audit engine remains independent of routes and persistence.
-The UI supports submission, progress, recent jobs, filters and exports. MCP is deferred.
+The UI and MCP share authenticated application services. See [MCP setup, tools and sample workflow](src/mcp/README.md).
 
 ## Run locally
 
@@ -41,6 +41,8 @@ To test failure/recovery, run only `npm run dev:web`, attempt to connect, then s
 | `npm run build` | Type-check, emit Node ESM, bundle frontend |
 | `npm run check` | Tests plus complete build/type checks |
 | `npm run test:ui` | Chromium browser tests with local API/worker fixtures |
+| `npm run test:mcp` | Protocol tests using the official MCP client and stdio subprocesses |
+| `npm run --silent dev:mcp` / `npm run --silent start:mcp` | Local stdio server (configured demo token required) |
 | `npm run check:all` | All Node and browser tests plus build/type checks |
 | `npm run start:api` | Run compiled API after build |
 | `npm run dev:worker` / `npm run start:worker` | Separate development / compiled worker |
@@ -62,7 +64,7 @@ src/
   web/                 React screens, API client, cancellable polling and exports
   application/
     auth.ts            Demo authentication adapter and token provisioning
-    audit-service.ts   Shared authenticated ownership boundary for API/future MCP
+    audit-service.ts   Shared authenticated ownership boundary for API and MCP
     health.ts          API liveness service
     audit/
       index.ts         auditPage public interface and orchestration
@@ -73,7 +75,7 @@ src/
   shared/              Browser-safe health contract
   infrastructure/      SQLite migrations and fenced persistent job store
   worker/              Separate consumer entry point and testable runner
-  mcp/                 Reserved: official MCP TypeScript SDK entry point
+  mcp/                 Official SDK stdio entry point, tools and bounded output views
 tests/                 API tests and ephemeral loopback HTTP fixtures
 dist/                  Generated builds (ignored)
 data/                  SQLite runtime files and sidecars (ignored)
@@ -83,7 +85,7 @@ The audit module depends on Node HTTP and Cheerio, with no imports from routes,
 the database, or UI. Flow: React → API → application services → SQLite;
 MCP → the same services; worker → SQLite queue → audit engine → stored results.
 Queue claims, leases, retries, crash recovery, and persistence are implemented.
-The frontend submission flow is implemented. The MCP adapter remains future work.
+Both the frontend workflow and local stdio MCP adapter are implemented.
 
 Node uses native ESM with NodeNext resolution; the frontend uses bundler
 resolution. Both inherit strict checking, checked indexing, and exact optional
@@ -525,3 +527,5 @@ empty (deny all), and the database path is data/audits.sqlite.
 Keep bearer tokens out of both files and never use a VITE_ prefix for secrets,
 since Vite exposes prefixed values to browser code. The web app does not need
 these server settings in its bundle.
+
+The frontend also includes a **Scripted MCP demo** chat panel. After connecting, use commands such as Audit https://cnbible.com/, Check its status, Show the issues, and List my audits. It calls the real stdio MCP server through an authenticated local bridge, without an AI model or LLM key. See [chat demo instructions](src/mcp/README.md#scripted-chat-demo-in-the-frontend).

@@ -24,7 +24,7 @@ const fixture = createHttpServer((req, res) => {
   } else { res.statusCode = 404; res.end('Not found'); }
 });
 await new Promise<void>((resolve) => fixture.listen(3102, '127.0.0.1', resolve));
-const api = buildApp({ store, approvedHosts: ['127.0.0.1:3102'] });
+const api = buildApp({ store, approvedHosts: ['127.0.0.1:3102'], mcpDatabasePath: path });
 await api.listen({ host: '127.0.0.1', port: 3101 });
 const child = fork(fileURLToPath(new URL('../../src/worker/main.ts', import.meta.url)), [], {
   execArgv: ['--import', 'tsx'], stdio: 'ignore',

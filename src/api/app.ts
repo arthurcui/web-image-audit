@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { McpDemoBridge, demoCallSchema } from './mcp-bridge.js';
 import type { Writable } from 'node:stream';
 import { getHealth } from '../application/health.js';
 import { DemoAuth } from '../application/auth.js';
@@ -11,7 +12,7 @@ import { SqliteJobStore } from '../infrastructure/job-store.js';
 const origins = new Set(['http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:4173', 'http://localhost:4173']);
 const corsHeaders = new Set(['authorization', 'content-type', 'idempotency-key']);
 
-export function buildApp(options: { logger?: boolean; logStream?: Writable; store?: JobStore & TokenStore; approvedHosts?: readonly string[] } = {}) {
+export function buildApp(options: { logger?: boolean; logStream?: Writable; store?: JobStore & TokenStore; approvedHosts?: readonly string[]; mcpDatabasePath?: string } = {}) {
   const app = Fastify({
     logger: options.logger ? {
       // Omit URLs, headers, and bodies, including on malformed/unauthenticated requests.
@@ -26,6 +27,9 @@ export function buildApp(options: { logger?: boolean; logStream?: Writable; stor
   if (!options.store) app.addHook('onClose', async () => { (store as SqliteJobStore).close(); });
   const auth = new DemoAuth(store);
   const audits = new AuditService(store, auth, options.approvedHosts ?? []);
+
+  const bridge = options.mcpDatabasePath ? new McpDemoBridge({ databasePath: options.mcpDatabasePath, approvedHosts: options.approvedHosts ?? [] }) : null;
+  app.addHook('onClose', async () => { await bridge?.close(); });
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof JobError) {
@@ -76,6 +80,17 @@ export function buildApp(options: { logger?: boolean; logStream?: Writable; stor
     return reply.code(202).header('Location', statusUrl).send({
       id: job.id, state: job.state, statusUrl, resultsUrl: statusUrl + '/results', replayed,
     });
+  });
+  app.post('/api/audits/mcp-demo', async (request, reply) => {
+    auth.authenticate(request.headers.authorization);
+    const parsed = demoCallSchema.safeParse(request.body);
+    if (!parsed.success) throw new JobError(400, 'invalid_request', 'Unsupported MCP demo command or arguments.');
+    if (!bridge) throw new JobError(503, 'mcp_unavailable', 'MCP demo requires a configured persistent database.');
+    const controller = new AbortController();
+    const cancel = () => { if (!reply.raw.writableEnded) controller.abort(); };
+    reply.raw.once('close', cancel);
+    try { return await bridge.call(request.headers.authorization!, parsed.data, controller.signal); }
+    finally { reply.raw.off('close', cancel); }
   });
   const params = { type: 'object', required: ['id'], additionalProperties: false,
     properties: { id: { type: 'string', pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' } } };
