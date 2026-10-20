@@ -21,14 +21,20 @@
     "db:migrate": "node --env-file-if-exists=.env --import tsx src/infrastructure/migrate.ts",
     "auth:token": "node --env-file-if-exists=.env --import tsx src/infrastructure/provision-token.ts",
     "test:ui": "playwright test",
-    "check:all": "npm run check && npm run test:ui"
+    "check:all": "npm run check && npm run test:ui",
+    "dev:mcp": "node --env-file-if-exists=.env --import tsx src/mcp/main.ts",
+    "start:mcp": "node --env-file-if-exists=.env dist/server/mcp/main.js",
+    "test:mcp": "tsx --test tests/mcp.test.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
+    "@modelcontextprotocol/server": "2.3.1",
     "better-sqlite3": "13.0.3",
     "cheerio": "1.2.0",
     "fastify": "5.12.7",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

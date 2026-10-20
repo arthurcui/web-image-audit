@@ -4,7 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { migrate } from './migrations.js';
 import { JobError } from '../application/jobs.js';
-import type { Attempt, Claim, Failure, Job, JobStore, Progress } from '../application/jobs.js';
+import type { Attempt, Claim, Failure, Job, JobCursor, JobStore, Progress } from '../application/jobs.js';
 import type { AuditResult } from '../application/audit/types.js';
 
 interface Row {
@@ -48,8 +48,12 @@ export class SqliteJobStore implements JobStore {
       : this.db.prepare('SELECT * FROM jobs WHERE id=? AND owner_id=?').get(id, ownerId)) as Row | undefined;
   }
   get(id: string, ownerId?: string) { const row = this.row(id, ownerId); return row ? job(row) : undefined; }
-  list(limit: number, ownerId?: string) {
+  list(limit: number, ownerId?: string, before?: JobCursor) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('limit must be 1..100');
+    if (before && ownerId !== undefined) {
+      return (this.db.prepare('SELECT * FROM jobs WHERE owner_id=? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC,id DESC LIMIT ?')
+        .all(ownerId, before.createdAt, before.createdAt, before.id, limit) as Row[]).map(job);
+    }
     return ((ownerId === undefined
       ? this.db.prepare('SELECT * FROM jobs ORDER BY created_at DESC,id DESC LIMIT ?').all(limit)
       : this.db.prepare('SELECT * FROM jobs WHERE owner_id=? ORDER BY created_at DESC,id DESC LIMIT ?').all(ownerId, limit)) as Row[]).map(job);

@@ -5,6 +5,7 @@ import { isActive, request } from './client.js';
 import type { ResultsResponse } from './client.js';
 import { usePolling } from './usePolling.js';
 import { Results } from './Results.js';
+import { McpChat } from './McpChat.js';
 
 const activeList = (value: { jobs: Job[] }) => value.jobs.some(isActive);
 const activeDetail = (value: { job: Job; results: ResultsResponse | null }) => isActive(value.job);
@@ -21,7 +22,7 @@ export function App() {
       <h1>A clearer picture<br />of your images<span className="accent">.</span></h1>
       <p className="description">Inspect image candidates, spot delivery issues, and review text alternatives.</p>
     </section>
-    {token === null ? <Connection onConnect={setToken} /> : <Workspace token={token} />}
+    {token === null ? <Connection onConnect={setToken} /> : <><Workspace token={token} /><McpChat token={token} /></>}
     <footer>Static HTML only · Local processing · No remote image previews<br />
       Demo authentication. Your token stays in memory and is cleared on disconnect or reload.</footer>
   </main>;
