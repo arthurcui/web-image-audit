@@ -72,19 +72,14 @@ export function McpChat({ token }: { token: string }) {
   }
   function submit(event: FormEvent) { event.preventDefault(); void execute(command); }
   return <section className="panel mcp-chat" aria-labelledby="mcp-title">
-    <div className="section-heading"><div><p className="eyebrow">LIVE TOOL CALLS / LOCAL STDIO</p><h2 id="mcp-title">Scripted MCP demo</h2></div>
+    <div className="section-heading"><div><p className="eyebrow">LIVE TOOL CALLS / LOCAL STDIO</p><h2 id="mcp-title">MCP chat</h2></div>
       <button className="secondary" disabled={busy} onClick={() => { setEntries([]); setLastId(null); setCommand(''); pending.current = null; }}>Clear chat</button></div>
     <p className="muted">A small command parser, not an AI model. Calls the real MCP server through a local stdio client. No LLM API key.
       Webpage content is untrusted data; it is never interpreted as commands.</p>
-    <p className="muted">{demoHelp}</p>
-    <div className="actions">
-      {['Check its status', 'Show the issues', 'List my audits'].map((text) => <button key={text} className="secondary" disabled={busy} onClick={() => { void execute(text); }}>{text}</button>)}
-    </div>
-    {lastId && <p className="muted">Current audit: <code>{lastId}</code></p>}
     <div ref={log} role="log" aria-label="MCP demo conversation" aria-live="polite" className="chat-log">
       {!entries.length && <p className="empty">Start with “audit https://example.com/” using an approved host.</p>}
       {entries.map((entry) => <article key={entry.id} className="chat-entry">
-        <p><strong>You:</strong> {entry.command}</p><p className={entry.failed ? 'error' : ''}><strong>Demo:</strong> {entry.summary}</p>
+        <p><strong>You:</strong> {entry.command}</p><p className={entry.failed ? 'error' : ''}><strong>Mcp:</strong> {entry.summary}</p>
         {entry.call && <details><summary>Tool call: {entry.call.name}{entry.reply ? ' · stdio response' : ' · request failed'}</summary>
           <pre>{JSON.stringify({ request: entry.call, ...(entry.reply ? { response: entry.reply.result } : {}) }, null, 2)}</pre></details>}
         {entry.failed && entry.call && <button className="secondary" disabled={busy} onClick={() => { void execute(entry.command, entry.call!); }}>Retry command</button>}
@@ -96,10 +91,15 @@ export function McpChat({ token }: { token: string }) {
           }}>More issues</button>}
       </article>)}
     </div>
-    <form onSubmit={submit}><label htmlFor="mcp-command">Demo command</label><div className="input-row">
+    <p className="muted">{demoHelp}</p>
+    <form onSubmit={submit}><label htmlFor="mcp-command">Chat command</label><div className="input-row">
       <input id="mcp-command" value={command} maxLength={2200} required disabled={busy} autoComplete="off"
         placeholder="audit https://example.com/" onChange={(event) => setCommand(event.target.value)} />
       <button disabled={busy}>{busy ? 'Calling MCP…' : 'Send command'}</button></div></form>
     <p role="status" className="muted">{busy ? 'Opening stdio connection and calling the tool…' : 'Ready. Status is checked only when requested. The last 20 exchanges stay in memory.'}</p>
+    <div className="actions">
+      {['Check its status', 'Show the issues', 'List my audits'].map((text) => <button key={text} className="secondary" disabled={busy} onClick={() => { void execute(text); }}>{text}</button>)}
+    </div>
+    {lastId && <p className="muted">Current audit: <code>{lastId}</code></p>}
   </section>;
 }

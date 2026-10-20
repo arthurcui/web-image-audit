@@ -10,7 +10,7 @@
 
 Verified on Node 26.8.2 / npm 11.19.1. Browser interactions and Node 24 were not
 verified.
-Milestones 2–5 were merged via PRs #1–#4. Milestone 6 is on feat/mcp-server.
+Milestones 2–6 were merged via PRs #1–#5. Rendered scanning is tracked in PR #6.
 
 ## Milestone 2 — static audit engine
 
@@ -76,12 +76,11 @@ Milestone 3 verification used Node 26.8.2 / npm 11.19.1, temporary local SQLite 
 - [x] Launch/client configuration, sample workflow, local-auth limitations and no-LLM-key setup documented.
 - [x] Final verification: 45 Node tests (including 6 MCP protocol tests), 6 Chromium tests, strict type checks and both builds passed. Compiled stdio handshake/tool-discovery/list smoke check and git diff --check passed.
 
-## Later milestones — not implemented
+## Repository follow-up
 
 - [ ] GitHub Actions checks required for PR merge.
 
-Stop after milestone 6 verification. No commit, push, PR creation, or deployment
-for this milestone unless requested.
+Milestone 7 changes remain local; no commit, push, or deployment is requested.
 
 - [x] Follow-up: native optional .env loading for API, worker, migration and token CLI; safe .env.example and ignored local configuration.
 
@@ -123,3 +122,20 @@ for this milestone unless requested.
 - [x] Removed temporary diagnostic instrumentation after confirming the environment mismatch.
 - [x] Existing running worker completed verification job f7d20eb6-76a6-4bf1-af8a-f5329098d712: 10 documents, 41 occurrences, 5 resources.
 - [x] 55 Node tests, strict type checks and both builds passed.
+
+## Milestone 7 — demo preparation
+
+- [x] Compact README: prerequisites, quick start, architecture, configuration, REST/MCP examples, verification and limitations.
+- [x] Five-minute demo script and five short architecture decision notes.
+- [x] Deterministic labeled fixture: responsive candidates, duplicate resources, missing/empty alt, broken and oversized images.
+- [x] Explicit fixture mode uses an isolated database and exact fixture host through the normal fetch policy.
+- [x] Structured audit-ID logs with token/URL exclusion tests; generated files and secrets ignored.
+- [x] Read-only GitHub Actions workflow authored for install, browser setup, type checks, tests and build; not pushed or executed on GitHub.
+- [x] Clean temporary checkout: npm ci, browser installation, demo token provisioning and production build passed.
+- [x] Full demo launcher rehearsal: REST submission/results, external-host denial, real stdio MCP summary, browser connection/inventory and shutdown passed.
+- [x] Final verification: 57 Node tests, 9 Chromium UI tests, strict type checks, production build and diff whitespace checks passed on Windows.
+
+The fixture produced 4 unique resources, 6 occurrences and 7 candidate rows.
+The rehearsal found and fixed an IPC shutdown hang; UI tests preserve the updated
+Request an audit and MCP chat wording. Linux/Node 24 CI execution remains unverified.
+No milestone 7 commit, push, publication or deployment was performed.

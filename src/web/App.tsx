@@ -16,10 +16,13 @@ const date = (time: number) => new Date(time).toLocaleString();
 
 export function App() {
   const [token, setToken] = useState<string | null>(null);
+  const [fixture, setFixture] = useState(false);
+  useEffect(() => { const controller = new AbortController(); void fetch('/api/health', { signal: controller.signal }).then(r => r.json()).then((v: { mode?: string }) => { if (!controller.signal.aborted) setFixture(v.mode === 'fixture'); }).catch(() => {}); return () => controller.abort(); }, []);
   return <main>
     <header><span className="brand">WIA<span className="brand-name"> / Website Image Audit</span></span>
       <div className="actions"><span className="local-dot">LOCAL DEMO</span>{token && <button className="secondary" onClick={() => setToken(null)}>Disconnect</button>}</div>
     </header>
+    {fixture && <p className="notice" role="status"><strong>FIXTURE MODE</strong> · Isolated demo database. Only http://127.0.0.1:3105 is approved.</p>}
     <section className="intro"><p className="eyebrow">LOOK CLOSER. LOAD LIGHTER.</p>
       <h1>A clearer picture<br />of your images<span className="accent">.</span></h1>
       <p className="description">Inspect image candidates, spot delivery issues, and review text alternatives.</p>
@@ -101,7 +104,7 @@ function Workspace({ token }: { token: string }) {
   }
   return <>
     <section className="panel" aria-labelledby="new-title">
-      <p className="eyebrow">02 / INSPECT</p><h2 id="new-title">New audit</h2>
+      <p className="eyebrow">AUDIT IMAGES</p><h2 id="new-title">Request an audit</h2>
       <form onSubmit={(event) => { void submit(event); }}>
         <label htmlFor="page-url">Webpage URL</label>
         <div className="input-row"><input id="page-url" type="url" placeholder="https://example.com/page" autoComplete="off"
@@ -126,7 +129,7 @@ function Workspace({ token }: { token: string }) {
     <div className="workspace">
       <Recent key={revision} token={token} selected={selected} onSelect={setSelected} />
       {selected ? <Detail key={selected} id={selected} token={token} onClose={() => setSelected(null)} />
-        : <section className="panel selection-empty"><p className="eyebrow">03 / REVIEW</p><h2>Your findings, in focus</h2>
+        : <section className="panel selection-empty"><p className="eyebrow">REVIEW AUDIT RESULTS</p><h2>Your findings, in focus</h2>
           <p className="muted">Start an audit or select a recent one to inspect its progress and image inventory.</p></section>}
     </div>
   </>;

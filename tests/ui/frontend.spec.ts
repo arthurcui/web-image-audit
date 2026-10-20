@@ -10,7 +10,7 @@ async function connect(page: Page) {
   await page.getByLabel('Local demo token').press('Tab');
   await expect(page.getByRole('button', { name: 'Connect', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'New audit' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start audit', exact: true })).toBeVisible();
 }
 function job(id: string, state: Job['state'] = 'completed'): Job {
   return { id, ownerId: 'test', url: 'https://example.com/' + id, state, createdAt: Date.now(), updatedAt: Date.now(),

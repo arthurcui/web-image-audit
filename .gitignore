@@ -16,3 +16,13 @@ data/
 
 test-results/
 playwright-report/
+
+# Local secrets and downloaded/exported artifacts
+secrets/
+*.pem
+*.key
+.npmrc.local
+downloads/
+exports/
+artifacts/
+logs/

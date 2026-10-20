@@ -8,7 +8,7 @@ const data = resolve(root, 'data');
 const cache = resolve(data, 'browsers');
 const env = { ...process.env, PLAYWRIGHT_BROWSERS_PATH: cache };
 const cli = resolve(dirname(require.resolve('playwright/package.json')), 'cli.js');
-const installed = spawnSync(process.execPath, [cli, 'install', 'chromium'], { env, stdio: 'inherit' });
+const installed = spawnSync(process.execPath, [cli, 'install', 'chromium', ...process.argv.slice(2)], { env, stdio: 'inherit' });
 if (installed.error) throw installed.error;
 if (installed.status !== 0) process.exit(installed.status ?? 1);
 const probe = spawnSync(process.execPath, ['--input-type=module', '-e', "import {chromium} from 'playwright'; console.log(chromium.executablePath());"], { cwd: root, env, encoding: 'utf8' });
