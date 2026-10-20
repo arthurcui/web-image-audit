@@ -1,3 +1,5 @@
+import { defaultScan, parseScan } from '../shared/scan.js';
+import type { ScanOptions } from '../shared/scan.js';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -8,13 +10,14 @@ import type { Attempt, Claim, Failure, Job, JobCursor, JobStore, Progress } from
 import type { AuditResult } from '../application/audit/types.js';
 
 interface Row {
+  scan_json: string;
   id: string; owner_id: string; url: string; state: Job['state']; attempts: number; max_attempts: number;
   created_at: number; updated_at: number; available_at: number; lease_until: number | null;
   progress_json: string; last_error_json: string | null; result_json: string | null;
 }
 const queued: Progress = { phase: 'queued', inspected: 0, total: null };
 function job(row: Row): Job {
-  return { id: row.id, ownerId: row.owner_id, url: row.url, state: row.state, attempts: row.attempts,
+  return { scan: parseScan(JSON.parse(row.scan_json)), id: row.id, ownerId: row.owner_id, url: row.url, state: row.state, attempts: row.attempts,
     maxAttempts: row.max_attempts, createdAt: row.created_at, updatedAt: row.updated_at,
     availableAt: row.available_at, leaseUntil: row.lease_until,
     progress: JSON.parse(row.progress_json) as Progress,
@@ -71,21 +74,22 @@ export class SqliteJobStore implements JobStore {
       return { job: job(row), result: row.result_json ? JSON.parse(row.result_json) as AuditResult : null, attempts };
     })();
   }
-  create(url: string, key?: string, ownerId = '__legacy__') {
+  create(url: string, key?: string, ownerId = '__legacy__', scan: ScanOptions = defaultScan) {
+    const encodedScan = JSON.stringify(parseScan(scan));
     const scopedKey = key === undefined ? undefined : JSON.stringify([ownerId, key]);
     return this.db.transaction(() => {
       if (key !== undefined) {
         const existing = this.db.prepare('SELECT * FROM jobs WHERE idempotency_key = ? AND owner_id = ?').get(scopedKey!, ownerId) as Row | undefined;
         if (existing) {
-          if (existing.url !== url) throw new JobError(409, 'idempotency_conflict', 'Idempotency-Key already belongs to a different URL');
+          if (existing.url !== url || existing.scan_json !== encodedScan) throw new JobError(409, 'idempotency_conflict', 'Idempotency-Key already belongs to a different audit payload');
           return { job: job(existing), replayed: true };
         }
       }
       const id = randomUUID();
       const now = this.now();
       this.db.prepare(`INSERT INTO jobs
-        (id,url,idempotency_key,state,max_attempts,created_at,updated_at,available_at,progress_json,owner_id)
-        VALUES (?,?,?,'queued',3,?,?,?,?,?)`).run(id, url, scopedKey ?? null, now, now, now, JSON.stringify(queued), ownerId);
+        (id,url,idempotency_key,state,max_attempts,created_at,updated_at,available_at,progress_json,owner_id,scan_json)
+        VALUES (?,?,?,'queued',3,?,?,?,?,?,?)`).run(id, url, scopedKey ?? null, now, now, now, JSON.stringify(queued), ownerId, encodedScan);
       return { job: this.get(id)!, replayed: false };
     }).immediate();
   }

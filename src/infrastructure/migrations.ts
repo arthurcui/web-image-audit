@@ -40,7 +40,7 @@ const migrations = [{
     ) STRICT;
     CREATE INDEX bearer_tokens_user ON bearer_tokens(user_id);
   `,
-}];
+}, { version: 3, sql: `ALTER TABLE jobs ADD COLUMN scan_json TEXT NOT NULL DEFAULT '{"mode":"static","includeIframes":false,"maxPages":10,"maxDepth":2}';` }];
 
 export function migrate(db: Database.Database) {
   db.transaction(() => {

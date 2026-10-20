@@ -5,7 +5,7 @@ background, and inspect issues and an image inventory. An MCP interface is imple
 for the same workflow.
 
 **Milestone 6 adds a local stdio MCP server using the official TypeScript SDK.**
-The reusable static audit engine remains independent of routes and persistence.
+The reusable static/rendered audit engine remains independent of routes and persistence.
 The UI and MCP share authenticated application services. See [MCP setup, tools and sample workflow](src/mcp/README.md).
 
 ## Run locally
@@ -15,6 +15,7 @@ No cloud services, global packages, or LLM API keys are needed. Generate a local
 
 ```sh
 npm ci
+npm run browser:install
 npm run dev
 ```
 
@@ -72,6 +73,8 @@ src/
       policy.ts        Central URL approval policy
       fetch.ts         Bounded HTTP transport, retries, shared request cache
       discover.ts      Cheerio parsing and srcset candidate discovery
+      documents.ts     Bounded page/iframe discovery with provenance
+      render.ts        Chromium DOM snapshots through the fetch policy
   shared/              Browser-safe health contract
   infrastructure/      SQLite migrations and fenced persistent job store
   worker/              Separate consumer entry point and testable runner
@@ -81,7 +84,7 @@ dist/                  Generated builds (ignored)
 data/                  SQLite runtime files and sidecars (ignored)
 ```
 
-The audit module depends on Node HTTP and Cheerio, with no imports from routes,
+The audit module depends on Node HTTP, Cheerio, and Playwright, with no imports from routes,
 the database, or UI. Flow: React → API → application services → SQLite;
 MCP → the same services; worker → SQLite queue → audit engine → stored results.
 Queue claims, leases, retries, crash recovery, and persistence are implemented.
@@ -120,7 +123,7 @@ the source module; after `npm run build`, plain Node callers can import
   inventory IDs but share cached network responses for their common destination.
 - `issues`: missing-alt review prompts, resource failures, skipped candidates,
   and oversized findings. Empty alt is retained and is not automatically an error.
-- `coverage`: whether all discovered candidates within this static model were
+- `coverage`: whether all discovered candidates within the configured scan model were
   inspected; reasons explicitly identify limits, failures, and skips. This is
   neither rendering coverage nor an accessibility-compliance verdict.
 
@@ -192,13 +195,13 @@ and Vite remain loopback-only; do not expose this as a public URL-fetch endpoint
 The engine requests identity encoding and explicitly skips compressed responses.
 It validates declared image MIME types, not file signatures or successful decoding:
 it cannot prove a purported image is valid. It does not measure dimensions,
-execute JavaScript, load CSS background images, crawl linked pages, or infer which
-responsive candidate a browser displays. Standalone source elements without an
+load CSS background images, or infer which responsive candidate a browser displays.
+Rendered mode executes JavaScript; crawl mode follows bounded same-origin links. Standalone source elements without an
 img fallback are outside the occurrence model. Static findings do not claim
 complete accessibility compliance; human review remains necessary.
 
 Dependencies are pinned with a lockfile: Fastify 5, React 19, Vite 8,
-TypeScript 7, Cheerio 1.2, and better-sqlite3 13. The official MCP SDK is deferred.
+TypeScript 7, Cheerio 1.2, and better-sqlite3 13. The official MCP SDK provides the stdio interface.
 Secrets, generated builds, dependencies, SQLite files, and sidecars are ignored.
 
 ## Official references
@@ -474,7 +477,7 @@ JSON preserves the original data. Exports may contain page-provided text and URL
 Install the test browser once, then run the complete checks:
 
 ```sh
-npx playwright install chromium
+npm run browser:install
 npm run check:all
 ```
 
@@ -529,3 +532,92 @@ since Vite exposes prefixed values to browser code. The web app does not need
 these server settings in its bundle.
 
 The frontend also includes a **Scripted MCP demo** chat panel. After connecting, use commands such as Audit https://cnbible.com/, Check its status, Show the issues, and List my audits. It calls the real stdio MCP server through an authenticated local bridge, without an AI model or LLM key. See [chat demo instructions](src/mcp/README.md#scripted-chat-demo-in-the-frontend).
+
+## Rendered pages, site crawling and iframe documents
+
+In **New audit**, choose **Static page**, **Rendered page (JavaScript)**, or
+**Rendered site crawl**. Enable **Inspect iframe documents** to include frames.
+Static page remains the default for existing API/MCP callers. Install the matching
+Chromium binary with `npm run browser:install`, then restart the API and worker.
+The database automatically migrates existing jobs to static-page options.
+
+API creation accepts an optional `scan` object; MCP `start_audit` accepts the same object:
+
+```json
+{"url":"https://example.com/","scan":{"mode":"crawl","includeIframes":true,"maxPages":10,"maxDepth":2}}
+```
+
+Scan settings are persisted with the job and included in idempotency comparisons.
+The engine's `AuditOptions.scan` accepts the same settings. Results include
+`scan`, a `documents` inventory, and `documentId`/`documentUrl` on each occurrence.
+Resource deduplication and image/occurrence/candidate limits apply across the entire
+job. A failed child document leaves the successful root audit completed with partial
+coverage. Failure to fetch/render the starting page fails the job.
+
+Crawling uses breadth-first, fragment-normalized URL discovery from anchors. It
+stays on the final starting page's origin, including redirects, with a default
+10 pages/depth 2 and hard maxima 20 pages/depth 3. Query strings remain distinct;
+cycles and duplicate URLs are skipped. Frame links do not expand the site crawl.
+Frames may use other explicitly approved hosts. Up to 10 frame documents and two
+frame nesting levels are inspected, including bounded inline `srcdoc` documents.
+Duplicate frame URLs are inspected once; occurrences represent unique document
+snapshots, not every visual embedding. Document discovery stops scheduling after
+120 seconds (checked between documents); in-flight bounded requests may finish later.
+
+Each rendered document uses a fresh 1280×900 Chromium context, waits one second
+after DOMContentLoaded, then extracts at most 2 MB of DOM HTML. Rendering has a
+15-second context deadline plus a 10-second launch deadline. All network requests
+are intercepted: approved GET script/style/fetch/XHR dependencies go through the
+same credential-free HTTP policy, byte limits, redirects, retries and deadlines.
+There are at most 50 such dependency requests per document, with the configured
+concurrency cap; excess requests are blocked and reported. No route is continued
+directly to the network. Images are inspected separately without retaining bodies.
+Browser image/media/font loading, workers, service workers, sockets, popups'
+network access, forms and script navigation are blocked. Cookies and authentication
+headers are never forwarded. Approve required script/API hosts as well as page,
+frame and image hosts; blocked dependencies may prevent images from being created.
+
+This is an approximate DOM discovery mode, not a full browser fidelity test.
+It does not click, log in, scroll indefinitely, inspect shadow roots or CSS
+backgrounds, or guarantee discovery of late content. Image-load-dependent scripts
+may fail because browser image downloads are blocked. Frames render independently;
+parent scripting, postMessage and inherited sessions are not reproduced. Original
+response security/CORS headers and redirect-relative script behavior are not fully
+reproduced by the bounded fetch bridge. Rendered coverage is always marked partial
+with its snapshot limitation. Missing/empty alt semantics remain unchanged.
+
+Only crawl approved sites you operate or have permission to inspect. This small
+crawler does not implement robots.txt scheduling or sitemap discovery. Browser
+execution expands the trust boundary: an allowlist and interception are not a
+hardened sandbox or complete SSRF defense. A production deployment needs isolated
+browser processes, resource quotas and network egress controls.
+
+Playwright APIs were checked against the official
+[BrowserContext](https://playwright.dev/docs/api/class-browsercontext),
+[Route](https://playwright.dev/docs/api/class-route), and
+[Page](https://playwright.dev/docs/api/class-page) references.
+
+
+### Troubleshooting browser startup
+
+If the worker cannot find Chromium, run `npm run browser:install` in the same
+terminal environment as the worker. Windows sandboxed terminals can use a different
+`LOCALAPPDATA` cache directory from ordinary PowerShell. To use a known installed
+browser, set `AUDIT_BROWSER_EXECUTABLE=C:/absolute/path/to/chrome.exe` in the ignored
+local `.env`, then restart `npm run dev:worker`. This setting is trusted local
+configuration and is never accepted from an audit request. After a Playwright
+upgrade, reinstall the matching browser and update an explicit path if necessary.
+
+Startup, navigation, timeout and DOM-size failures now have separate messages.
+A browser blocked by OS permissions still requires a terminal permitted to launch
+it; configuring an executable path does not grant permissions. Existing failed
+jobs remain historical records; submit a new audit after fixing the configuration.
+
+
+The browser installer now writes to ignored `data/browsers` and records the matching
+executable in ignored `data/browser-runtime.json`. The worker reads this manifest
+on each rendered document; it takes priority over an inherited
+`AUDIT_BROWSER_EXECUTABLE` value. This avoids user-profile cache visibility differences
+and stale environment values inherited by Node watch processes. Run the installer
+again after upgrading Playwright or moving the project. With no project manifest,
+the explicit environment setting and then Playwright's default cache are used.

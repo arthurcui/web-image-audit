@@ -1,3 +1,4 @@
+import { parseScan } from '../shared/scan.js';
 import type { Authenticator } from './auth.js';
 import { JobError } from './jobs.js';
 import type { JobCursor, JobStore } from './jobs.js';
@@ -12,9 +13,9 @@ export class AuditService {
   create(authorization: unknown, input: unknown, key?: unknown) {
     const userId = this.auth.authenticate(authorization);
     if (typeof input !== 'object' || input === null || Array.isArray(input)
-      || Object.keys(input).length !== 1 || !('url' in input)
+      || Object.keys(input).some(k => !['url', 'scan'].includes(k)) || !('url' in input)
       || typeof input.url !== 'string' || input.url.length < 1 || input.url.length > 2048) {
-      throw new JobError(400, 'invalid_request', 'Expected a URL-only payload');
+      throw new JobError(400, 'invalid_request', 'Expected a URL and optional scan options');
     }
     if (key !== undefined && (typeof key !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(key))) {
       throw new JobError(400, 'invalid_idempotency_key', 'Invalid Idempotency-Key');
@@ -22,7 +23,10 @@ export class AuditService {
     let url: string;
     try { url = this.policy(input.url).href; }
     catch (error) { throw new JobError(400, 'invalid_target', error instanceof Error ? error.message : 'Invalid URL'); }
-    return this.store.create(url, key as string | undefined, userId);
+    let scan;
+    try { scan = parseScan('scan' in input ? input.scan : undefined); }
+    catch { throw new JobError(400, 'invalid_request', 'Invalid scan options'); }
+    return this.store.create(url, key as string | undefined, userId, scan);
   }
   get(authorization: unknown, id: string) {
     const userId = this.auth.authenticate(authorization);

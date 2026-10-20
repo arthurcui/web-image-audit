@@ -32,14 +32,14 @@ export function csvCell(value: string) {
 }
 export function toCsv(result: AuditResult) {
   const rows = inventory(result).map((row) => [
-    row.occurrence.id, row.resource?.id ?? '', row.candidate?.url ?? row.candidate?.rawUrl ?? '',
+    row.occurrence.id, row.occurrence.documentUrl ?? result.page.url, row.resource?.id ?? '', row.candidate?.url ?? row.candidate?.rawUrl ?? '',
     row.candidate ? row.candidate.element + '[' + row.candidate.attribute + ']' : '',
     row.candidate?.role ?? '', row.candidate?.descriptor ?? '', row.candidate?.media ?? '',
     outcome(row), row.resource?.contentType ?? '', row.resource?.bytes.toString() ?? '',
     row.resource?.bytesComplete.toString() ?? '', row.occurrence.alt.state,
     row.occurrence.alt.state === 'missing' ? '' : row.occurrence.alt.value, row.issues.join('; '),
   ]);
-  return [['Occurrence ID', 'Resource ID', 'Image URL', 'Source attribute', 'Candidate role', 'Descriptor', 'Media',
+  return [['Occurrence ID', 'Document URL', 'Resource ID', 'Image URL', 'Source attribute', 'Candidate role', 'Descriptor', 'Media',
     'HTTP outcome', 'Content type', 'Bytes consumed', 'Bytes complete', 'Alt status', 'Alt text', 'Issues'], ...rows]
     .map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }

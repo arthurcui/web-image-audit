@@ -114,9 +114,9 @@ test('invalid token, form validation, empty results and retryable API errors', a
   await expect(page.getByRole('button', { name: 'Retry details' })).toBeVisible();
   detailError = false;
   await page.getByRole('button', { name: 'Retry details' }).click();
-  await expect(page.getByText('No image occurrences found in the static HTML.')).toBeVisible();
+  await expect(page.getByText('No image occurrences found in the inspected documents.')).toBeVisible();
   await page.getByLabel('Filter inventory').selectOption('missing');
-  await expect(page.getByText('No image occurrences found in the static HTML.')).toBeVisible();
+  await expect(page.getByText('No image occurrences found in the inspected documents.')).toBeVisible();
 });
 
 test('polls active jobs only and stops after completion and disconnect', async ({ page }) => {
@@ -135,7 +135,7 @@ test('polls active jobs only and stops after completion and disconnect', async (
   await expect(page.getByRole('progressbar')).toBeVisible();
   await expect.poll(() => details).toBeGreaterThan(1);
   state = 'completed';
-  await expect(page.getByText('No image occurrences found in the static HTML.')).toBeVisible();
+  await expect(page.getByText('No image occurrences found in the inspected documents.')).toBeVisible();
   await expect(page.locator('.recent .badge')).toHaveText('completed');
   const finished = calls;
   await page.waitForTimeout(1800);
@@ -224,4 +224,22 @@ test('disconnect during active polling clears private content and stops requests
   expect(calls).toBe(stopped);
   await expect(page.getByLabel('Local demo token')).toHaveValue('');
   await expect(page.getByText('https://example.com/' + first, { exact: true })).toHaveCount(0);
+});
+
+test('rendered crawl form reaches worker and exposes document provenance', async ({ page }, info) => {
+  await connect(page);
+  await page.getByLabel('Webpage URL').fill('http://127.0.0.1:3102/render-root');
+  await page.getByLabel('Scan mode').selectOption('crawl');
+  await page.getByLabel('Inspect iframe documents').check();
+  await page.getByLabel('Maximum pages').fill('2');
+  await page.getByLabel('Maximum link depth').fill('1');
+  await page.getByRole('button', { name: 'Start audit' }).click();
+  await expect(page.getByRole('heading', { name: 'Image inventory' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.metrics div').filter({ hasText: 'Unique resources' }).locator('dd')).toHaveText('1');
+  await expect(page.locator('.metrics div').filter({ hasText: 'HTML occurrences' }).locator('dd')).toHaveText('3');
+  await expect(page.locator('tbody')).toContainText('Dynamic image');
+  await expect(page.locator('tbody')).toContainText('/render-frame');
+  await page.getByText('3 documents · crawl scan', { exact: true }).click();
+  await expect(page.locator('.detail details')).toContainText('/render-child');
+  await page.screenshot({ path: info.outputPath('rendered-crawl.png'), fullPage: true });
 });

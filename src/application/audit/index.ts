@@ -1,4 +1,4 @@
-import { discover } from './discover.js';
+import { collectDocuments } from './documents.js';
 import { createFetcher } from './fetch.js';
 import { createUrlPolicy } from './policy.js';
 import { defaults } from './types.js';
@@ -32,24 +32,13 @@ function metadata(result: FetchResult): FetchResult {
     ...(retryAfterMs === undefined ? {} : { retryAfterMs }) };
 }
 
-/** Fetch exactly one document and inspect its static image candidates; never crawl links. */
+/** Inspect a bounded set of static or rendered documents and deduplicate image resources globally. */
 export async function auditPage(pageUrl: string, options: AuditOptions, hooks: { onProgress?: (progress: { inspected: number; total: number }) => void } = {}): Promise<AuditResult> {
   const limits = getLimits(options);
   const policy = createUrlPolicy(options.approvedHosts);
   const fetchResource = createFetcher(policy, limits);
-  const page = await fetchResource(pageUrl, true);
-  const result: AuditResult = {
-    page: metadata(page), occurrences: [], resources: [], issues: [],
-    coverage: { complete: false, reasons: [] },
-  };
-  if (page.state !== 'ok' || !page.body) {
-    result.coverage.reasons.push('Page could not be inspected: ' + (page.code ?? page.state));
-    return result;
-  }
-  const { occurrences, baseUrl, reasons } = discover(page.body, page.url, limits, page.charset);
-  delete page.body;
-  result.occurrences = occurrences;
-  result.baseUrl = baseUrl;
+  const { result, reasons } = await collectDocuments(pageUrl, options, limits);
+  const occurrences = result.occurrences;
   const resources = new Map<string, Resource>();
   for (const occurrence of occurrences) {
     if (occurrence.alt.state === 'missing') {
@@ -58,7 +47,7 @@ export async function auditPage(pageUrl: string, options: AuditOptions, hooks: {
     }
     for (const candidate of occurrence.candidates) {
       if (!candidate.skipped) {
-        try { candidate.url = policy(candidate.rawUrl, baseUrl).href; }
+        try { candidate.url = policy(candidate.url ?? candidate.rawUrl, result.baseUrl).href; }
         catch (error) { candidate.skipped = error instanceof Error ? error.message : 'URL rejected'; }
       }
       if (candidate.url && !candidate.skipped) {

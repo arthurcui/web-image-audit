@@ -27,7 +27,7 @@ export function parseRetryAfter(value: string, now = Date.now()): number | undef
   return Number.isFinite(date) ? Math.max(0, date - now) : undefined;
 }
 
-function requestOnce(url: URL, page: boolean, limits: Limits): Promise<Hop> {
+function requestOnce(url: URL, page: boolean | 'asset', limits: Limits): Promise<Hop> {
   return new Promise((resolve) => {
     let done = false;
     let bytes = 0;
@@ -58,7 +58,7 @@ function requestOnce(url: URL, page: boolean, limits: Limits): Promise<Hop> {
       maxHeaderSize: 16_384,
       // No caller-provided headers, cookies, authentication or automatic redirects.
       headers: { 'user-agent': 'WebsiteImageAudit/0.2', 'accept-encoding': 'identity',
-        accept: page ? 'text/html,application/xhtml+xml' : 'image/*' },
+        accept: page === 'asset' ? '*/*' : page ? 'text/html,application/xhtml+xml' : 'image/*' },
     }, (response) => {
       status = response.statusCode ?? 0;
       contentType = (response.headers['content-type'] ?? '').split(';')[0]!.trim().toLowerCase();
@@ -81,7 +81,7 @@ function requestOnce(url: URL, page: boolean, limits: Limits): Promise<Hop> {
           ...(delay === undefined ? {} : { retryAfterMs: delay }) });
         return;
       }
-      const validType = page
+      const validType = page === 'asset' ? !!contentType : page
         ? ['text/html', 'application/xhtml+xml'].includes(contentType)
         : /^image\/[a-z0-9!#$&^_.+-]+$/.test(contentType);
       if (!validType) {
@@ -122,7 +122,7 @@ function requestOnce(url: URL, page: boolean, limits: Limits): Promise<Hop> {
 /** Cache each image hop, including redirects, to coalesce aliases and concurrent requests. */
 export function createFetcher(policy: UrlPolicy, limits: Limits) {
   const cache = new Map<string, Promise<Hop>>();
-  async function withRetry(url: URL, page: boolean): Promise<Hop> {
+  async function withRetry(url: URL, page: boolean | 'asset'): Promise<Hop> {
     for (let attempt = 0; ; attempt++) {
       const result = await requestOnce(url, page, limits);
       result.attempts = attempt + 1;
@@ -138,7 +138,7 @@ export function createFetcher(policy: UrlPolicy, limits: Limits) {
       await sleep(Math.ceil(delay));
     }
   }
-  return async (input: string, page = false): Promise<Hop> => {
+  return async (input: string, page: boolean | 'asset' = false): Promise<Hop> => {
     let current = input;
     let attempts = 0;
     const visited = new Set<string>();

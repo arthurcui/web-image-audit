@@ -4,6 +4,7 @@ import { AuditService } from '../application/audit-service.js';
 import { JobError } from '../application/jobs.js';
 import { jobSchema, jobView, notice, resultView, resultsSchema, sectionSchema, state, count } from './views.js';
 
+const scanSchema = z.strictObject({ mode: z.enum(['static', 'rendered', 'crawl']).optional(), includeIframes: z.boolean().optional(), maxPages: z.number().int().min(1).max(20).optional(), maxDepth: z.number().int().min(0).max(3).optional() });
 const pageSize = z.number().int().min(1).max(20).default(10);
 const errorSchema = z.strictObject({ code: z.string().max(64), message: z.string().max(256) });
 const envelope = <T extends z.ZodType>(data: T) => z.strictObject({ ok: z.boolean(), data: data.nullable(), error: errorSchema.nullable() });
@@ -38,12 +39,12 @@ export function createMcpServer(service: AuditService, authorization: string) {
     return { content: [{ type: 'text' as const, text: JSON.stringify(output) }], structuredContent: output, isError: output['ok'] === false };
   }
   server.registerTool('start_audit', {
-    description: 'Queue one static webpage audit for the configured user and immediately return its job ID. Does not wait or run a worker. Only approved HTTP/HTTPS hosts are allowed; optional idempotencyKey safely replays the same URL.',
-    inputSchema: z.strictObject({ url: z.string().min(1).max(2048), idempotencyKey: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional() }),
+    description: 'Queue a static page, rendered page, or bounded same-origin crawl audit for the configured user and immediately return its job ID. Does not wait or run a worker. Only approved HTTP/HTTPS hosts are allowed; optional idempotencyKey safely replays the same payload. Optional scan selects mode, includeIframes, maxPages (1–20), and maxDepth (0–3). Rendering needs installed Chromium.',
+    inputSchema: z.strictObject({ url: z.string().min(1).max(2048), scan: scanSchema.optional(), idempotencyKey: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional() }),
     outputSchema: startOutput,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-  }, async ({ url, idempotencyKey }) => invoke(startOutput, () => {
-    const { job, replayed } = service.create(authorization, { url }, idempotencyKey);
+  }, async ({ url, scan, idempotencyKey }) => invoke(startOutput, () => {
+    const { job, replayed } = service.create(authorization, { url, ...(scan ? { scan } : {}) }, idempotencyKey);
     return { id: job.id, state: job.state, replayed };
   }));
   server.registerTool('get_audit_status', {

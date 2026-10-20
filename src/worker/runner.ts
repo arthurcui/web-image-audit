@@ -52,7 +52,7 @@ export class AuditWorker {
       catch (error) { lost = true; this.options.onError?.(error); }
     }, this.heartbeatMs);
     try {
-      const result = await this.audit(claim.job.url, this.options.auditOptions, {
+      const result = await this.audit(claim.job.url, { ...this.options.auditOptions, ...(claim.job.scan ? { scan: claim.job.scan } : {}) }, {
         onProgress: (progress) => {
           if (!lost && !this.store.progress(claim, { phase: 'inspecting-images', ...progress })) lost = true;
         },
