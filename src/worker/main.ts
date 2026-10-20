@@ -1,3 +1,4 @@
+import { writeAuditLog } from './log.js';
 import { readConfig } from '../config.js';
 import { SqliteJobStore } from '../infrastructure/job-store.js';
 import { AuditWorker } from './runner.js';
@@ -6,12 +7,13 @@ const config = readConfig();
 const store = new SqliteJobStore(config.databasePath);
 const worker = new AuditWorker(store, {
   auditOptions: { approvedHosts: config.approvedHosts },
-  onError: (error) => console.error('Worker error:', error),
+  onEvent: writeAuditLog,
+  onError: () => writeAuditLog({ event: 'worker_error' }),
 });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => {
-  console.info('Worker draining current audit; no new jobs will be claimed.');
+  writeAuditLog({ event: 'worker_stopping' });
   worker.stop();
 });
-console.info('Audit worker started.');
+writeAuditLog({ event: 'worker_started' });
 try { await worker.run(); }
 finally { store.close(); }

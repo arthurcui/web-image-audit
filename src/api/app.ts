@@ -12,7 +12,7 @@ import { SqliteJobStore } from '../infrastructure/job-store.js';
 const origins = new Set(['http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:4173', 'http://localhost:4173']);
 const corsHeaders = new Set(['authorization', 'content-type', 'idempotency-key']);
 
-export function buildApp(options: { logger?: boolean; logStream?: Writable; store?: JobStore & TokenStore; approvedHosts?: readonly string[]; mcpDatabasePath?: string } = {}) {
+export function buildApp(options: { fixtureMode?: boolean; logger?: boolean; logStream?: Writable; store?: JobStore & TokenStore; approvedHosts?: readonly string[]; mcpDatabasePath?: string } = {}) {
   const app = Fastify({
     logger: options.logger ? {
       // Omit URLs, headers, and bodies, including on malformed/unauthenticated requests.
@@ -70,12 +70,13 @@ export function buildApp(options: { logger?: boolean; logStream?: Writable; stor
   app.options('/api/audits', async (_request, reply) => reply.code(204).send());
   app.options('/api/audits/*', async (_request, reply) => reply.code(204).send());
   app.setNotFoundHandler((_request, reply) => reply.code(404).send({ error: { code: 'not_found', message: 'Route not found' } }));
-  app.get('/api/health', async () => getHealth());
+  app.get('/api/health', async () => ({ ...getHealth(), ...(options.fixtureMode ? { mode: 'fixture' } : {}) }));
   app.post<{ Body: { url: string } }>('/api/audits', {
     schema: { body: { type: 'object', additionalProperties: false, required: ['url'],
       properties: { url: { type: 'string', minLength: 1, maxLength: 2048 }, scan: { type: 'object' } } } },
   }, async (request, reply) => {
     const { job, replayed } = audits.create(request.headers.authorization, request.body, request.headers['idempotency-key']);
+    request.log.info({ event: 'audit_created', auditId: job.id, replayed }, 'Audit queued');
     const statusUrl = '/api/audits/' + job.id;
     return reply.code(202).header('Location', statusUrl).send({
       id: job.id, state: job.state, statusUrl, resultsUrl: statusUrl + '/results', replayed,

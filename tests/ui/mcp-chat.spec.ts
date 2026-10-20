@@ -11,10 +11,10 @@ test('scripted chat uses the real MCP bridge from start through status and issue
   await page.goto('/');
   await page.getByLabel('Local demo token').fill(fixtureToken);
   await page.getByRole('button', { name: 'Connect', exact: true }).click();
-  const chat = page.getByRole('region', { name: 'Scripted MCP demo', exact: true });
+  const chat = page.getByRole('region', { name: 'MCP chat', exact: true });
   await expect(chat).toContainText('not an AI model');
-  await chat.getByLabel('Demo command').fill('Audit ' + fixtureUrl);
-  await chat.getByLabel('Demo command').press('Enter');
+  await chat.getByLabel('Chat command').fill('Audit ' + fixtureUrl);
+  await chat.getByLabel('Chat command').press('Enter');
   await expect(chat.getByRole('log')).toContainText('Check its status next.');
   await expect.poll(async () => {
     await chat.getByRole('button', { name: 'Check its status', exact: true }).click();
@@ -30,7 +30,7 @@ test('scripted chat uses the real MCP bridge from start through status and issue
   expect(bridgeCalls).toBeGreaterThanOrEqual(4);
   expect(directCreates).toBe(0);
   const previous = bridgeCalls;
-  await chat.getByLabel('Demo command').fill('Tell me a joke');
+  await chat.getByLabel('Chat command').fill('Tell me a joke');
   await chat.getByRole('button', { name: 'Send command', exact: true }).click();
   await expect(chat.getByRole('log')).toContainText('Try: audit');
   expect(bridgeCalls).toBe(previous);
@@ -38,7 +38,7 @@ test('scripted chat uses the real MCP bridge from start through status and issue
   await chat.getByRole('button', { name: 'Clear chat', exact: true }).click();
   await expect(chat.getByRole('log')).not.toContainText('Current audit');
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Scripted MCP demo', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'MCP chat', exact: true })).toHaveCount(0);
 });
 
 test('chat retries retain the exact idempotency key and disconnect ignores late responses', async ({ page }) => {
@@ -53,7 +53,7 @@ test('chat retries retain the exact idempotency key and disconnect ignores late 
   await page.goto('/');
   await page.getByLabel('Local demo token').fill(fixtureToken);
   await page.getByRole('button', { name: 'Connect', exact: true }).click();
-  await page.getByLabel('Demo command').fill('Audit https://example.com/');
+  await page.getByLabel('Chat command').fill('Audit https://example.com/');
   await page.getByRole('button', { name: 'Send command' }).click();
   await page.getByRole('button', { name: 'Retry command' }).click();
   await expect(page.getByRole('log')).toContainText('Check its status next.');

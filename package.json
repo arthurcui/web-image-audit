@@ -25,7 +25,10 @@
     "check:all": "npm run check && npm run test:ui",
     "dev:mcp": "node --env-file-if-exists=.env --import tsx src/mcp/main.ts",
     "start:mcp": "node --env-file-if-exists=.env dist/server/mcp/main.js",
-    "test:mcp": "tsx --test tests/mcp.test.ts"
+    "test:mcp": "tsx --test tests/mcp.test.ts",
+    "demo": "node scripts/demo.mjs",
+    "demo:token": "node scripts/demo.mjs token",
+    "demo:mcp": "node scripts/demo.mjs mcp"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "2.3.1",
