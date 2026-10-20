@@ -1,9 +1,11 @@
+import type { ScanOptions } from '../shared/scan.js';
 import type { AuditResult } from './audit/types.js';
 
 export type JobState = 'queued' | 'running' | 'completed' | 'failed';
 export interface Progress { phase: 'queued' | 'fetching-page' | 'inspecting-images' | 'completed' | 'failed'; inspected: number; total: number | null }
 export interface Failure { code: string; message: string; at: number; retryable: boolean }
 export interface Job {
+  scan?: ScanOptions;
   id: string; ownerId: string; url: string; state: JobState; attempts: number; maxAttempts: number;
   createdAt: number; updatedAt: number; availableAt: number; leaseUntil: number | null;
   progress: Progress; lastError: Failure | null;
@@ -17,7 +19,7 @@ export class JobError extends Error {
   constructor(public readonly statusCode: number, public readonly code: string, message: string) { super(message); }
 }
 export interface JobStore {
-  create(url: string, key?: string, ownerId?: string): { job: Job; replayed: boolean };
+  create(url: string, key?: string, ownerId?: string, scan?: ScanOptions): { job: Job; replayed: boolean };
   get(id: string, ownerId?: string): Job | undefined;
   list(limit: number, ownerId?: string, before?: JobCursor): Job[];
   results(id: string, ownerId?: string): { job: Job; result: AuditResult | null; attempts: Attempt[] } | undefined;

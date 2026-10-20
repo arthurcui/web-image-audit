@@ -5,6 +5,8 @@ import { isActive, request } from './client.js';
 import type { ResultsResponse } from './client.js';
 import { usePolling } from './usePolling.js';
 import { Results } from './Results.js';
+import { defaultScan } from '../shared/scan.js';
+import type { ScanOptions } from '../shared/scan.js';
 import { McpChat } from './McpChat.js';
 
 const activeList = (value: { jobs: Job[] }) => value.jobs.some(isActive);
@@ -23,7 +25,7 @@ export function App() {
       <p className="description">Inspect image candidates, spot delivery issues, and review text alternatives.</p>
     </section>
     {token === null ? <Connection onConnect={setToken} /> : <><Workspace token={token} /><McpChat token={token} /></>}
-    <footer>Static HTML only · Local processing · No remote image previews<br />
+    <footer>Static or rendered scans · Local processing · No remote image previews<br />
       Demo authentication. Your token stays in memory and is cleared on disconnect or reload.</footer>
   </main>;
 }
@@ -65,6 +67,7 @@ function Workspace({ token }: { token: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [url, setUrl] = useState('');
+  const [scan, setScan] = useState<ScanOptions>({ ...defaultScan });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const pending = useRef<{ url: string; key: string } | null>(null);
@@ -79,14 +82,15 @@ function Workspace({ token }: { token: string }) {
       if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error();
     } catch { setError('Enter an HTTP or HTTPS URL without embedded credentials.'); return; }
     // Retain the key after an uncertain failure; retrying the same URL cannot duplicate a job.
-    if (pending.current?.url !== target) pending.current = { url: target, key: crypto.randomUUID() };
+    const payloadKey = JSON.stringify({ url: target, scan });
+    if (pending.current?.url !== payloadKey) pending.current = { url: payloadKey, key: crypto.randomUUID() };
     const controller = new AbortController();
     submission.current = controller;
     setBusy(true); setError('');
     try {
       const created = await request<{ id: string }>(token, '', controller.signal, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': pending.current.key },
-        body: JSON.stringify({ url: target }),
+        body: JSON.stringify({ url: target, scan }),
       });
       if (controller.signal.aborted) return;
       pending.current = null;
@@ -103,7 +107,17 @@ function Workspace({ token }: { token: string }) {
         <div className="input-row"><input id="page-url" type="url" placeholder="https://example.com/page" autoComplete="off"
           required maxLength={2048} value={url} disabled={busy} onChange={(event) => setUrl(event.target.value)} aria-describedby="scan-limits" />
           <button disabled={busy}>{busy ? 'Submitting…' : 'Start audit'}</button></div>
-        <p className="muted" id="scan-limits">One page, not a crawl. Static HTML only; JavaScript-rendered images are not discovered.
+        <label htmlFor="scan-mode">Scan mode</label>
+        <select id="scan-mode" disabled={busy} value={scan.mode} onChange={e => setScan({ ...scan, mode: e.target.value as ScanOptions['mode'] })}>
+          <option value="static">Static page</option><option value="rendered">Rendered page (JavaScript)</option><option value="crawl">Rendered site crawl</option>
+        </select>
+        <label className="checkbox-label"><input type="checkbox" checked={scan.includeIframes} disabled={busy} onChange={e => setScan({ ...scan, includeIframes: e.target.checked })} /> Inspect iframe documents</label>
+        {scan.mode === 'crawl' && <div className="actions">
+          <label>Maximum pages <input type="number" min="1" max="20" required disabled={busy} value={scan.maxPages} onChange={e => setScan({ ...scan, maxPages: Number(e.target.value) })} /></label>
+          <label>Maximum link depth <input type="number" min="0" max="3" required disabled={busy} value={scan.maxDepth} onChange={e => setScan({ ...scan, maxDepth: Number(e.target.value) })} /></label>
+        </div>}
+        <p className="muted" id="scan-limits">Rendered scans execute JavaScript and take a timed DOM snapshot. Crawls follow same-origin links, up to 20 pages and depth 3.
+          Iframes are inspected independently, up to 10 documents and depth 2. No login, clicks, or infinite scrolling.
           Page and image hosts must be explicitly approved on the server. Default limits: 100 unique resources, 500 image occurrences,
           2 MB of HTML and 10 MB per image; images above 500 KB are flagged. Limits may leave partial results.</p>
         {error && <p className="error" role="alert">{error}</p>}

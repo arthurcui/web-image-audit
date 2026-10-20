@@ -172,8 +172,7 @@ remote MCP endpoint, OAuth issuer, JWT issuance, or LLM connection. A production
 remote transport would need a proper external authorization provider and token
 validation, while retaining shared service ownership checks.
 
-Static scanning still excludes iframe documents, CSS backgrounds and
-JavaScript-rendered images; it does not establish complete accessibility compliance.
+Static mode does not execute JavaScript. Optional iframe inspection and rendered/crawl modes are available; CSS backgrounds remain excluded. No mode establishes complete accessibility compliance.
 
 ## Scripted chat demo in the frontend
 
@@ -217,3 +216,18 @@ The official MCP client is a runtime dependency for this bridge. Browser tests
 cover real chat -> HTTP bridge -> stdio server -> SQLite -> separate worker ->
 results, and distinguish this from direct REST audit submission. Additional
 checks cover cross-user access, rejected tool shapes, retries and disconnect.
+### Scan modes
+
+`start_audit` also accepts optional `scan`:
+
+```json
+{"url":"https://example.com/","scan":{"mode":"crawl","includeIframes":true,"maxPages":5,"maxDepth":1},"idempotencyKey":"crawl-demo-1"}
+```
+
+Modes are `static` (default), `rendered`, and `crawl`. Limits: 1-20 pages,
+0-3 link depth; iframe inspection defaults off. Install Chromium with
+`npm run browser:install` on the worker machine. Scan options participate
+in idempotency. Candidate results include document URLs; coverage explains skipped
+or incomplete documents. See the root README for snapshot, iframe and crawl bounds.
+The scripted chat's simple `Audit URL` command retains static defaults; use the
+frontend scan form or an MCP client to select rendered/crawl options.

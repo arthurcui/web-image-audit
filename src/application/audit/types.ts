@@ -1,4 +1,6 @@
+import type { ScanOptions } from '../../shared/scan.js';
 export interface AuditOptions {
+  scan?: ScanOptions;
   /** Exact URL.host entries, including non-default ports. Empty means deny all. */
   approvedHosts: readonly string[];
   concurrency?: number;
@@ -33,7 +35,7 @@ export const defaults = {
 export type Limits = { [K in keyof typeof defaults]: number };
 export type FailureCode = 'policy' | 'invalid-url' | 'http' | 'content-type'
   | 'encoding' | 'timeout' | 'network' | 'byte-limit' | 'redirect-limit'
-  | 'redirect-loop' | 'invalid-redirect' | 'retry-after';
+  | 'redirect-loop' | 'invalid-redirect' | 'retry-after' | 'render' | 'browser-missing' | 'browser-launch' | 'render-timeout' | 'render-navigation' | 'dom-limit';
 
 export interface FetchResult {
   url: string;
@@ -64,6 +66,8 @@ export interface Candidate {
 }
 export interface Occurrence {
   id: string;
+  documentUrl?: string;
+  documentId?: string;
   alt: { state: 'missing' } | { state: 'empty' | 'text'; value: string };
   candidates: Candidate[];
 }
@@ -74,6 +78,8 @@ export interface Resource extends FetchResult {
 }
 export interface AuditResult {
   page: FetchResult;
+  scan?: ScanOptions;
+  documents?: Array<{ id: string; url: string; kind: 'page' | 'iframe'; depth: number; parentUrl?: string; state: string }>;
   baseUrl?: string;
   occurrences: Occurrence[];
   resources: Resource[];

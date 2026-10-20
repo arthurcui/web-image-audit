@@ -73,7 +73,7 @@ export function buildApp(options: { logger?: boolean; logStream?: Writable; stor
   app.get('/api/health', async () => getHealth());
   app.post<{ Body: { url: string } }>('/api/audits', {
     schema: { body: { type: 'object', additionalProperties: false, required: ['url'],
-      properties: { url: { type: 'string', minLength: 1, maxLength: 2048 } } } },
+      properties: { url: { type: 'string', minLength: 1, maxLength: 2048 }, scan: { type: 'object' } } } },
   }, async (request, reply) => {
     const { job, replayed } = audits.create(request.headers.authorization, request.body, request.headers['idempotency-key']);
     const statusUrl = '/api/audits/' + job.id;

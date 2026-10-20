@@ -167,3 +167,13 @@ test('invalid credentials fail without stdout or token disclosure; stdin EOF exi
   const clean = await run(env.tokenA);
   assert.equal(clean.code, 0); assert.equal(clean.stdout, ''); assert.equal(clean.stderr, '');
 });
+
+test('MCP accepts bounded scan options and uses them in idempotency checks', async t => {
+  const env = await setup(t); const { client } = await env.connect();
+  const args = { url: 'https://example.com/', scan: { mode: 'crawl', includeIframes: true, maxPages: 2, maxDepth: 1 }, idempotencyKey: 'scan-options' };
+  const id = data(await call(client, 'start_audit', args))['id'] as string;
+  assert.equal(env.store.get(id)?.scan?.mode, 'crawl');
+  assert.equal(data(await call(client, 'start_audit', args))['id'], id);
+  assert.equal((await call(client, 'start_audit', { ...args, scan: { mode: 'static' } })).isError, true);
+  assert.equal((await call(client, 'start_audit', { ...args, scan: { mode: 'crawl', maxPages: 21 } })).isError, true);
+});

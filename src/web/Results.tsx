@@ -17,9 +17,11 @@ export function Results({ result, id }: { result: AuditResult; id: string }) {
     ['Missing alt', result.occurrences.filter((occurrence) => occurrence.alt.state === 'missing').length],
   ] as const;
   return <>
+    {result.documents && <details><summary>{result.documents.length} documents · {result.scan?.mode ?? 'static'} scan</summary>
+      <ul>{result.documents.map(doc => <li key={doc.id}>{doc.kind}: {doc.url} · {doc.state}{doc.parentUrl ? ' · from ' + doc.parentUrl : ''}</li>)}</ul></details>}
     <dl className="metrics">{counts.map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{count}</dd></div>)}</dl>
     <div className={result.coverage.complete ? 'notice' : 'notice warning'}>
-      <strong>{result.coverage.complete ? 'Static inspection complete' : 'Partial coverage'}</strong>
+      <strong>{result.coverage.complete ? 'Inspection complete' : 'Partial coverage'}</strong>
       <p>Page: {result.page.status ? 'HTTP ' + result.page.status : result.page.state}{result.page.message ? ' · ' + result.page.message : ''}</p>
       {!result.coverage.complete && <ul>{result.coverage.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}
     </div>
@@ -38,13 +40,13 @@ export function Results({ result, id }: { result: AuditResult; id: string }) {
       </select>
     </label>
     <p role="status" className="muted">{filtered.length} of {rows.length} candidate rows</p>
-    {filtered.length === 0 ? <p className="empty">{rows.length === 0 ? 'No image occurrences found in the static HTML.' : 'No candidates match this filter.'}</p>
+    {filtered.length === 0 ? <p className="empty">{rows.length === 0 ? 'No image occurrences found in the inspected documents.' : 'No candidates match this filter.'}</p>
       : <div className="table-scroll" tabIndex={0} role="region" aria-label="Scrollable image inventory">
         <table><caption className="sr-only">Image candidates and inspection outcomes</caption>
           <thead><tr>{['Image URL', 'Source attribute', 'HTTP outcome', 'Content type', 'Byte size', 'Alt-text status', 'Issues'].map((heading) => <th scope="col" key={heading}>{heading}</th>)}</tr></thead>
           <tbody>{filtered.map((row) => <tr key={row.key}>
             <td className="url-cell">{row.candidate?.url ?? row.candidate?.rawUrl ?? 'No image source'}
-              <small>{row.occurrence.id}{row.resource ? ' · ' + row.resource.id : ''}</small>
+              <small>Document: {row.occurrence.documentUrl ?? result.page.url}</small><small>{row.occurrence.id}{row.resource ? ' · ' + row.resource.id : ''}</small>
               {row.resource && row.resource.url !== row.resource.requestedUrl && <small>Final URL: {row.resource.url}</small>}</td>
             <td>{row.candidate ? <><code>{row.candidate.element}[{row.candidate.attribute}]</code><small>{row.candidate.role}
               {row.candidate.descriptor ? ' · ' + row.candidate.descriptor : ''}{row.candidate.media ? ' · ' + row.candidate.media : ''}</small></> : '—'}</td>

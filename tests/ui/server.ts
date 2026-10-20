@@ -15,7 +15,12 @@ const path = join(directory, 'audits.sqlite');
 const store = new SqliteJobStore(path);
 store.saveToken(tokenHash(fixtureToken), 'browser-fixture');
 const fixture = createHttpServer((req, res) => {
-  if (req.url === '/page') {
+  if (req.url === '/render-root') {
+    res.setHeader('content-type', 'text/html');
+    res.end('<body><script>setTimeout(()=>{let i=document.createElement("img");i.src="/ok.png";i.alt="Dynamic image";document.body.append(i)},50)</script><a href="/render-child">Child</a><iframe src="/render-frame"></iframe></body>');
+  } else if (req.url === '/render-child' || req.url === '/render-frame') {
+    res.setHeader('content-type', 'text/html'); res.end('<img src="/ok.png" alt="Document image">');
+  } else if (req.url === '/page') {
     res.setHeader('content-type', 'text/html');
     res.end('<img src="/ok.png" alt=""><img src="/ok.png"><picture><source srcset="/big.png 2x"><img src="/missing.png" alt="=SUM(1,2)"></picture><img data-src="https://unapproved.invalid/lazy.png" alt="lazy">');
   } else if (req.url === '/ok.png' || req.url === '/big.png') {

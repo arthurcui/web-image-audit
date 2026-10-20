@@ -93,3 +93,33 @@ for this milestone unless requested.
 - [x] In-memory chat, retry idempotency, pagination, disconnect cleanup and escaped untrusted text.
 - [x] Verified 47 Node tests and 8 Chromium tests; strict type checks and both builds passed.
 - [x] Final chat/bridge tests re-passed after polish; compiled API-to-compiled MCP smoke passed; screenshot inspected and diff whitespace checked.
+
+## Follow-up - rendered documents, bounded site crawl and iframes
+
+- [x] Persisted validated scan settings with backwards-compatible migration and idempotency.
+- [x] Chromium snapshots with intercepted credential-free dependency fetches and bounded execution.
+- [x] Same-origin bounded link crawl, independent iframe/srcdoc inspection and cycle detection.
+- [x] Global image deduplication/limits, document provenance and partial-coverage reporting.
+- [x] Frontend scan controls, document inventory and export provenance; MCP scan input.
+- [x] Local-fixture engine, worker, MCP and frontend workflow tests added.
+- [x] Verification: 52 Node tests, 9 Chromium tests, strict type checks and both builds passed.
+
+
+### Browser startup repair
+
+- [x] Reproduced a missing-browser cache mismatch between normal Windows and sandboxed environments.
+- [x] Added trusted AUDIT_BROWSER_EXECUTABLE configuration and browser:install setup command.
+- [x] Distinct sanitized missing-browser, launch, navigation, timeout and DOM-limit diagnostics; browser cleanup covers initialization failures.
+- [x] Configured ignored local .env to use the verified installed headless Chromium binary.
+- [x] Verified 54 Node tests, type checks/build, and targeted rendered-crawl UI test.
+- [x] Live cnbible.com crawl with 10 pages/depth 2 and frames disabled: 10 successful documents, 41 occurrences, 5 unique resources; partial coverage remains explicit.
+
+
+### Worker-visible browser installation
+
+- [x] Diagnosed actual running worker: configured user-cache executable reported absent inside its environment.
+- [x] browser:install now installs into ignored data/browsers and writes an ignored runtime manifest.
+- [x] Renderer prefers the project manifest over stale inherited browser paths; no runtime downloads.
+- [x] Removed temporary diagnostic instrumentation after confirming the environment mismatch.
+- [x] Existing running worker completed verification job f7d20eb6-76a6-4bf1-af8a-f5329098d712: 10 documents, 41 occurrences, 5 resources.
+- [x] 55 Node tests, strict type checks and both builds passed.
