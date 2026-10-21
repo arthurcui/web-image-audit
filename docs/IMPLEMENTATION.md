@@ -139,3 +139,39 @@ The fixture produced 4 unique resources, 6 occurrences and 7 candidate rows.
 The rehearsal found and fixed an IPC shutdown hang; UI tests preserve the updated
 Request an audit and MCP chat wording. Linux/Node 24 CI execution remains unverified.
 No milestone 7 commit, push, publication or deployment was performed.
+### Fixture visual clarity
+
+- [x] Dedicated small responsive fallback; preserved 768 px breakpoint and enlarged oversized image.
+- [x] Updated expected inventory to 5 resources, 6 occurrences and 7 candidates.
+- [x] Two fixture tests and strict type checks passed; Chromium verified 320/640 px responsive display and 1200 px oversized display.
+
+### Shared contract boundary
+
+- [x] Moved audit results and job/attempt contracts into src/shared; updated server, web and test imports.
+- [x] Kept worker claims, stores, errors and engine configuration in application modules.
+- [x] Verified frontend TypeScript file graph excludes server sources; 57 Node tests, 9 UI tests, strict type checks and production build passed.
+
+### Repository boundaries and organization
+
+- [x] Enforced web/application/shared dependency boundaries in check:all and CI, including type-only imports and re-exports.
+- [x] Used pinned dependency-cruiser with SWC for TypeScript 7; regression test proves forbidden dependencies fail and shared contracts pass.
+- [x] Moved checklist into docs and frontend-only command parser into web; documented API bridge placement.
+- [x] Split pure unit tests from integration tests, preserving UI/helpers and updating process paths and npm scripts.
+- [x] Enabled allowJs/checkJs for scripts/*.mjs in the tools TypeScript configuration.
+- [x] Verification: 57 existing Node tests plus the new boundary regression passed; all 9 UI tests, strict type checks (including scripts), build and whitespace checks passed.
+
+### Database and worker readiness
+
+- [x] Added GET /api/ready with independent database/worker check results and 200/503; liveness remains unchanged.
+- [x] Migration 4 records process heartbeats independently of job leases; 5-second renewal, 15-second expiry, multi-worker support and shutdown removal.
+- [x] Database probe checks schema access and write-lock availability; failures return sanitized status without paths or SQL details.
+- [x] Verified cross-connection freshness/expiry, multiple workers, shutdown cleanup, database contention/unavailability and real idle-worker renewal.
+- [x] 61 Node tests, 9 UI tests, boundary checks, strict type checks and production build passed.
+
+### Scoped persistence capabilities
+
+- [x] Replaced JobStore with owner-facing AuditRepository and privileged WorkerQueue; renamed TokenStore to TokenRepository.
+- [x] Required explicit owner IDs for creation and all public reads, with runtime guards and no unscoped read fallback or legacy-owner default.
+- [x] Narrowed service, authentication, API and worker dependencies while preserving one SQLite implementation and lease fencing.
+- [x] Added runtime ownership/cross-owner claim tests and compile-only assertions for prohibited capabilities and missing owners.
+- [x] Verified 62 Node tests, 9 UI tests, strict type checks, dependency boundaries, production build and whitespace checks.

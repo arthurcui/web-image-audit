@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildApp } from '../src/api/app.js';
-import { isHealthResponse } from '../src/shared/health.js';
+import { buildApp } from '../../src/api/app.js';
+import { isHealthResponse } from '../../src/shared/health.js';
 
 test('health endpoint returns the public JSON contract', async (t) => {
   const app = buildApp();
@@ -18,10 +18,4 @@ test('audit submission requires authentication', async (t) => {
   t.after(() => app.close());
   const response = await app.inject({ method: 'POST', url: '/api/audits', payload: { url: 'https://example.com' } });
   assert.equal(response.statusCode, 401);
-});
-
-test('browser contract validation rejects malformed responses', () => {
-  for (const value of [null, [], 'ok', {}, { status: 'ok' }, { status: 'error', service: 'website-image-audit' }, { status: 'ok', service: 'other' }]) {
-    assert.equal(isHealthResponse(value), false);
-  }
 });

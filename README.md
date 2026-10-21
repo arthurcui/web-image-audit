@@ -35,7 +35,7 @@ The intentionally broken image makes coverage partial; the job still completes.
 
 | Expected result | Count |
 | --- | ---: |
-| Unique resources | 4 |
+| Unique resources | 5 |
 | HTML image occurrences | 6 |
 | Responsive/fallback candidates | 7 |
 | Missing alt | 1 |
@@ -48,7 +48,8 @@ claim that large dimensions cause large file sizes. For optional rendered/iframe
 inspection, scan `/dynamic.html` in rendered mode with iframe inspection enabled.
 The fixture itself is visibly labeled at http://127.0.0.1:3105/.
 
-See the [five-minute demo script](docs/DEMO.md) and [architecture decisions](docs/DECISIONS.md).
+See the [five-minute demo script](docs/DEMO.md), [architecture decisions](docs/DECISIONS.md),
+and [implementation checklist](docs/IMPLEMENTATION.md).
 
 ## Normal mode and configuration
 
@@ -83,9 +84,36 @@ Never store tokens in committed files or in `VITE_` variables.
 
 API and Vite bind to loopback. CORS is restricted to localhost/127.0.0.1 frontend
 ports 5173 and 4173. `GET /api/health` is liveness, not worker readiness; fixture
-mode adds `mode: "fixture"`. Job progress demonstrates worker activity.
+mode adds `mode: "fixture"`.
+
+`GET /api/ready` is an unauthenticated local readiness probe. It returns HTTP 200
+only when SQLite schema access/write-lock acquisition succeeds and at least one
+worker has a heartbeat newer than 15 seconds; otherwise it returns HTTP 503:
+
+```json
+{"status":"ready","checks":{"database":"ready","worker":"ready"}}
+```
+
+A missing/stale worker reports `worker: "unavailable"`. A database failure reports
+`database: "unavailable"` and `worker: "unknown"`, without SQL, paths, identities,
+or exception details. Both probes use Cache-Control: no-store. Example:
+`curl -i http://127.0.0.1:3001/api/ready`.
+
+Migration 4 stores worker presence separately from job leases. Idle and busy workers
+renew every 5 seconds; shutdown removes their own record before draining work.
+After a crash, readiness can remain positive for up to 15 seconds. Multiple workers
+are supported: any fresh worker is sufficient. Expired records are pruned on renewal.
+Restart API and worker after upgrading so both use the same migrated database.
+
+The database probe uses a short transaction with the existing one-second SQLite
+busy timeout; it does not modify audit data. It checks access and write-lock
+availability, not disk integrity, free space, or future write durability. Worker
+presence does not guarantee queue capacity, successful audits, approved target
+hosts, or Chromium availability. Liveness stays independent of these checks.
 
 ## Architecture
+
+See the [database ER diagram](docs/DECISIONS.md#database-schema) for tables, keys and ownership relationships.
 
 ```mermaid
 flowchart LR
@@ -104,8 +132,11 @@ flowchart LR
 
 `src/application` contains services and the reusable audit engine; `src/api`,
 `src/web`, `src/worker` and `src/mcp` are separate entry points.
+`src/shared` owns the browser-safe audit and job contracts consumed by both sides.
 `src/infrastructure` owns migrations and parameterized SQL; `src/demo` is the
-local fixture. No network I/O happens inside database transactions.
+local fixture. No network I/O happens inside database transactions. AuditService uses an owner-scoped
+AuditRepository; the trusted worker uses WorkerQueue; authentication uses
+TokenRepository. One SQLite implementation supplies all three interfaces.
 
 Jobs are `queued`, `running`, `completed`, or `failed`. Individual broken images
 can coexist with a completed audit. Claims and lease updates are atomic; writes
@@ -167,6 +198,7 @@ Webpage strings are untrusted data, never instructions.
 ## Verification and logs
 
 ```sh
+npm run check:boundaries
 npm run typecheck
 npm test
 npm run test:ui
@@ -174,6 +206,20 @@ npm run build
 # Or all of the above:
 npm run check:all
 ```
+
+Dependency rules in .dependency-cruiser.json are enforced by check:all and CI,
+including type-only imports and re-exports. Web may import web/shared; application
+may import application/shared; shared may import only shared within src. Web/shared
+cannot import Node built-ins. SWC parses TypeScript 7 for dependency-cruiser; the
+normal TypeScript compiler still checks types. A regression test deliberately
+violates the boundaries to prove the checker runs.
+
+Pure tests live in tests/unit (npm run test:unit); HTTP, database, browser-engine
+and child-process tests live in tests/integration (npm run test:integration).
+Playwright user workflows remain in tests/ui. npm test runs both Node suites.
+The tools tsconfig checks scripts/*.mjs with allowJs/checkJs as well as tests.
+The demo command parser lives in src/web because only the chat UI consumes it;
+src/demo remains the Node fixture website.
 
 Tests use local HTTP fixtures, temporary databases, real MCP clients and Chromium.
 They cover policy/redirects/retries/limits, ownership, concurrent claims,

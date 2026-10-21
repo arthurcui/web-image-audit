@@ -1,4 +1,4 @@
-import type { AuditResult, Candidate, Occurrence, Resource } from '../application/audit/types.js';
+import type { AuditResult, Candidate, Occurrence, Resource } from '../shared/audit.js';
 
 export interface InventoryRow {
   key: string; occurrence: Occurrence; candidate: Candidate | null; resource: Resource | undefined; issues: string[];

@@ -40,7 +40,10 @@ const migrations = [{
     ) STRICT;
     CREATE INDEX bearer_tokens_user ON bearer_tokens(user_id);
   `,
-}, { version: 3, sql: `ALTER TABLE jobs ADD COLUMN scan_json TEXT NOT NULL DEFAULT '{"mode":"static","includeIframes":false,"maxPages":10,"maxDepth":2}';` }];
+}, { version: 3, sql: `ALTER TABLE jobs ADD COLUMN scan_json TEXT NOT NULL DEFAULT '{"mode":"static","includeIframes":false,"maxPages":10,"maxDepth":2}';` }, { version: 4, sql: `
+  CREATE TABLE worker_heartbeats (worker_id TEXT PRIMARY KEY, heartbeat_at INTEGER NOT NULL) STRICT;
+  CREATE INDEX worker_heartbeats_time ON worker_heartbeats(heartbeat_at);
+` }];
 
 export function migrate(db: Database.Database) {
   db.transaction(() => {

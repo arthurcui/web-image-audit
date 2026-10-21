@@ -8,3 +8,8 @@ export function isHealthResponse(value: unknown): value is HealthResponse {
     && 'status' in value && value.status === 'ok'
     && 'service' in value && value.service === 'website-image-audit';
 }
+
+export interface ReadinessResponse {
+  status: 'ready' | 'not_ready';
+  checks: { database: 'ready' | 'unavailable'; worker: 'ready' | 'unavailable' | 'unknown' };
+}

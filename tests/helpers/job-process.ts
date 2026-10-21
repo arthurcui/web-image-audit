@@ -6,7 +6,7 @@ const store = new SqliteJobStore(path);
 process.send({ ready: true });
 process.once('message', () => {
   const result = action === 'create'
-    ? store.create('https://example.com/', 'shared-key')
+    ? store.create('https://example.com/', 'shared-key', 'fixture-user')
     : store.claim(200);
   store.close();
   process.send?.({ result: result ?? null }, () => process.disconnect());

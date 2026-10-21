@@ -1,5 +1,6 @@
 import { loadBuffer } from 'cheerio';
-import type { Candidate, Limits, Occurrence } from './types.js';
+import type { Limits } from './types.js';
+import type { Candidate, Occurrence } from '../../shared/audit.js';
 
 /** HTML-style tokenization: commas inside URL tokens (notably data URLs) are retained. */
 export function* parseSrcset(input: string): Generator<{ url: string; descriptor: string; valid: boolean }> {

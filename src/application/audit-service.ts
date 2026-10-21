@@ -1,13 +1,13 @@
 import { parseScan } from '../shared/scan.js';
 import type { Authenticator } from './auth.js';
 import { JobError } from './jobs.js';
-import type { JobCursor, JobStore } from './jobs.js';
+import type { JobCursor, AuditRepository } from './jobs.js';
 import { createUrlPolicy } from './audit/policy.js';
 
 /** Public application boundary. API/MCP must use this, not the trusted worker repository. */
 export class AuditService {
   private readonly policy: ReturnType<typeof createUrlPolicy>;
-  constructor(private readonly store: JobStore, private readonly auth: Authenticator, approvedHosts: readonly string[]) {
+  constructor(private readonly store: AuditRepository, private readonly auth: Authenticator, approvedHosts: readonly string[]) {
     this.policy = createUrlPolicy(approvedHosts);
   }
   create(authorization: unknown, input: unknown, key?: unknown) {

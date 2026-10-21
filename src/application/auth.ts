@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { JobError } from './jobs.js';
 
-export interface TokenStore {
+export interface TokenRepository {
   saveToken(hash: string, userId: string): void;
   tokenUser(hash: string): string | undefined;
 }
@@ -9,7 +9,7 @@ export function tokenHash(token: string) {
   return createHash('sha256').update(token).digest('hex');
 }
 /** Provisioning is a trusted local operation, never an HTTP endpoint. */
-export function provisionToken(store: TokenStore, userId: string): string {
+export function provisionToken(store: TokenRepository, userId: string): string {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(userId)) {
     throw new Error('User ID must start with a letter or digit and contain at most 64 letters, digits, dots, underscores, or hyphens');
   }
@@ -19,7 +19,7 @@ export function provisionToken(store: TokenStore, userId: string): string {
 }
 export interface Authenticator { authenticate(authorization: unknown): string }
 export class DemoAuth implements Authenticator {
-  constructor(private readonly store: TokenStore) {}
+  constructor(private readonly store: TokenRepository) {}
   authenticate(authorization: unknown): string {
     const match = typeof authorization === 'string'
       ? /^Bearer (wia_[A-Za-z0-9_-]{43})$/i.exec(authorization) : null;

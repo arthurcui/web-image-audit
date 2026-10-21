@@ -10,12 +10,12 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { Writable } from 'node:stream';
 import Database from 'better-sqlite3';
-import { SqliteJobStore } from '../src/infrastructure/job-store.js';
-import { DemoAuth, provisionToken, tokenHash } from '../src/application/auth.js';
-import { AuditService } from '../src/application/audit-service.js';
-import { buildApp } from '../src/api/app.js';
-import { JobError } from '../src/application/jobs.js';
-import type { AuditResult } from '../src/application/audit/types.js';
+import { SqliteJobStore } from '../../src/infrastructure/job-store.js';
+import { DemoAuth, provisionToken, tokenHash } from '../../src/application/auth.js';
+import { AuditService } from '../../src/application/audit-service.js';
+import { buildApp } from '../../src/api/app.js';
+import { JobError } from '../../src/application/jobs.js';
+import type { AuditResult } from '../../src/shared/audit.js';
 
 function setup(t: TestContext) {
   const store = new SqliteJobStore(':memory:');
@@ -86,7 +86,7 @@ test('HTTP endpoints reveal neither foreign jobs nor their results or attempt hi
   const created = await app.inject({ method: 'POST', url: '/api/audits', headers: { authorization: b },
     payload: { url: 'https://example.com/new' } });
   assert.equal(created.statusCode, 202);
-  assert.equal(store.get(created.json<{ id: string }>().id)!.ownerId, 'user-b');
+  assert.equal(store.get(created.json<{ id: string }>().id, 'user-b')!.ownerId, 'user-b');
   for (const authorization of [undefined, 'Bearer invalid', 'Basic anything']) {
     for (const url of ['/api/audits', '/api/audits/' + aJob.id, '/api/audits/' + aJob.id + '/results']) {
       const response = await app.inject({ url, headers: authorization ? { authorization } : {} });
@@ -137,7 +137,7 @@ test('CLI prints a fresh token exactly once; SQLite and sidecars contain only it
   t.after(() => rm(dir, { recursive: true, force: true }));
   const path = join(dir, 'jobs.sqlite');
   const run = promisify(execFile);
-  const script = fileURLToPath(new URL('../src/infrastructure/provision-token.ts', import.meta.url));
+  const script = fileURLToPath(new URL('../../src/infrastructure/provision-token.ts', import.meta.url));
   const { stdout, stderr } = await run(process.execPath, ['--import', 'tsx', script, 'cli-user'], {
     env: { ...process.env, AUDIT_DB_PATH: path },
   });
@@ -169,7 +169,7 @@ test('migration quarantines pre-auth jobs without deleting their results', async
   t.after(() => rm(dir, { recursive: true, force: true }));
   const path = join(dir, 'jobs.sqlite');
   // Reproduce v1 schema from the shipped migration, not an artificial mock schema.
-  const source = await readFile(fileURLToPath(new URL('../src/infrastructure/migrations.ts', import.meta.url)), 'utf8');
+  const source = await readFile(fileURLToPath(new URL('../../src/infrastructure/migrations.ts', import.meta.url)), 'utf8');
   const v1 = /version: 1,\s+sql: `([\s\S]*?)`/.exec(source)?.[1];
   assert.ok(v1);
   const raw = new Database(path);
@@ -185,8 +185,8 @@ test('migration quarantines pre-auth jobs without deleting their results', async
     const auth = new DemoAuth(store);
     const service = new AuditService(store, auth, ['example.com']);
     const bearer = 'Bearer ' + provisionToken(store, 'new-user');
-    assert.equal(store.get(id)!.ownerId, '__legacy__');
-    assert.ok(store.results(id)!.result);
+    assert.equal(store.get(id, '__legacy__')!.ownerId, '__legacy__');
+    assert.ok(store.results(id, '__legacy__')!.result);
     assert.deepEqual(service.list(bearer), []);
     assert.throws(() => service.get(bearer, id), errorCode(404));
     assert.throws(() => service.results(bearer, id), errorCode(404));

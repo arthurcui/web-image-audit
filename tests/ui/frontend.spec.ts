@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Route } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import type { Job } from '../../src/application/jobs.js';
+import type { Job } from '../../src/shared/jobs.js';
 import { fixtureToken, fixtureUrl } from './fixture.js';
 
 async function connect(page: Page) {

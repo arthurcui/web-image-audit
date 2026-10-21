@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { demoHelp, parseDemoCommand } from '../shared/demo-command.js';
-import type { DemoCall } from '../shared/demo-command.js';
+import { demoHelp, parseDemoCommand } from './demo-command.js';
+import type { DemoCall } from './demo-command.js';
 
 interface Reply { transport: 'stdio'; tool: string; result: { isError?: boolean; structuredContent?: {
   ok: boolean; data: Record<string, unknown> | null; error: { message: string } | null;

@@ -3,10 +3,10 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import test from 'node:test';
 import type { TestContext } from 'node:test';
-import { auditPage, createUrlPolicy } from '../src/application/audit/index.js';
-import type { AuditOptions } from '../src/application/audit/index.js';
-import { parseRetryAfter } from '../src/application/audit/fetch.js';
-import { parseSrcset } from '../src/application/audit/discover.js';
+import { auditPage, createUrlPolicy } from '../../src/application/audit/index.js';
+import type { AuditOptions } from '../../src/application/audit/index.js';
+import { parseRetryAfter } from '../../src/application/audit/fetch.js';
+import { parseSrcset } from '../../src/application/audit/discover.js';
 
 type Handler = (request: IncomingMessage, response: ServerResponse) => void;
 async function fixture(t: TestContext, handler: Handler) {

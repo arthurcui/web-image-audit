@@ -2,8 +2,10 @@ import { collectDocuments } from './documents.js';
 import { createFetcher } from './fetch.js';
 import { createUrlPolicy } from './policy.js';
 import { defaults } from './types.js';
-import type { AuditOptions, AuditResult, FetchResult, Limits, Resource } from './types.js';
-export type { AuditOptions, AuditResult, Candidate, Occurrence, Resource, FetchResult } from './types.js';
+import type { AuditOptions, Limits } from './types.js';
+import type { AuditResult, FetchResult, Resource } from '../../shared/audit.js';
+export type { AuditOptions } from './types.js';
+export type { AuditResult, Candidate, Occurrence, Resource, FetchResult } from '../../shared/audit.js';
 export { createUrlPolicy } from './policy.js';
 
 function getLimits(options: AuditOptions): Limits {

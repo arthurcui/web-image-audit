@@ -3,7 +3,8 @@ import { request as httpsRequest } from 'node:https';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { PolicyError } from './policy.js';
 import type { UrlPolicy } from './policy.js';
-import type { FetchResult, Limits } from './types.js';
+import type { Limits } from './types.js';
+import type { FetchResult } from '../../shared/audit.js';
 
 interface Hop extends FetchResult {
   body?: Buffer;
