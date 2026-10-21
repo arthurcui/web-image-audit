@@ -1,19 +1,30 @@
 export class PolicyError extends Error {
-  constructor(public readonly code: 'policy' | 'invalid-url', message: string) {
+  constructor(
+    public readonly code: 'policy' | 'invalid-url',
+    message: string,
+  ) {
     super(message);
   }
 }
 
 /** Central policy for initial URLs, discovered candidates, and every redirect. */
 export function createUrlPolicy(approvedHosts: readonly string[]) {
-  const allowed = new Set(approvedHosts.map((host) => {
-    const parsed = new URL('https://' + host);
-    if (parsed.host.toLowerCase() !== host.toLowerCase() || parsed.pathname !== '/'
-      || parsed.username || parsed.password || parsed.search || parsed.hash) {
-      throw new TypeError('approvedHosts must contain exact normalized URL.host values');
-    }
-    return host.toLowerCase();
-  }));
+  const allowed = new Set(
+    approvedHosts.map((host) => {
+      const parsed = new URL('https://' + host);
+      if (
+        parsed.host.toLowerCase() !== host.toLowerCase() ||
+        parsed.pathname !== '/' ||
+        parsed.username ||
+        parsed.password ||
+        parsed.search ||
+        parsed.hash
+      ) {
+        throw new TypeError('approvedHosts must contain exact normalized URL.host values');
+      }
+      return host.toLowerCase();
+    }),
+  );
   return (input: string, base?: string): URL => {
     let url: URL;
     try {

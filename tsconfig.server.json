@@ -19,6 +19,7 @@
     "src/infrastructure/**/*.ts",
     "src/worker/**/*.ts",
     "src/mcp/**/*.ts",
-    "src/demo/**/*.ts"
+    "src/demo/**/*.ts",
+    "src/cli/**/*.ts"
   ]
 }

@@ -1,1 +1,0 @@
-main.ts runs the separate worker; runner.ts owns claims, heartbeats, progress, retries, and graceful draining. See the root README for configuration and consistency guarantees.

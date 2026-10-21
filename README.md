@@ -86,30 +86,9 @@ API and Vite bind to loopback. CORS is restricted to localhost/127.0.0.1 fronten
 ports 5173 and 4173. `GET /api/health` is liveness, not worker readiness; fixture
 mode adds `mode: "fixture"`.
 
-`GET /api/ready` is an unauthenticated local readiness probe. It returns HTTP 200
-only when SQLite schema access/write-lock acquisition succeeds and at least one
-worker has a heartbeat newer than 15 seconds; otherwise it returns HTTP 503:
-
-```json
-{"status":"ready","checks":{"database":"ready","worker":"ready"}}
-```
-
-A missing/stale worker reports `worker: "unavailable"`. A database failure reports
-`database: "unavailable"` and `worker: "unknown"`, without SQL, paths, identities,
-or exception details. Both probes use Cache-Control: no-store. Example:
-`curl -i http://127.0.0.1:3001/api/ready`.
-
-Migration 4 stores worker presence separately from job leases. Idle and busy workers
-renew every 5 seconds; shutdown removes their own record before draining work.
-After a crash, readiness can remain positive for up to 15 seconds. Multiple workers
-are supported: any fresh worker is sufficient. Expired records are pruned on renewal.
-Restart API and worker after upgrading so both use the same migrated database.
-
-The database probe uses a short transaction with the existing one-second SQLite
-busy timeout; it does not modify audit data. It checks access and write-lock
-availability, not disk integrity, free space, or future write durability. Worker
-presence does not guarantee queue capacity, successful audits, approved target
-hosts, or Chromium availability. Liveness stays independent of these checks.
+`GET /api/ready` returns 200 when database access and a recent worker heartbeat
+are available, otherwise 503. See [operations](docs/OPERATIONS.md) for timing,
+shutdown, migration and recovery details.
 
 ## Architecture
 
@@ -133,7 +112,7 @@ flowchart LR
 `src/application` contains services and the reusable audit engine; `src/api`,
 `src/web`, `src/worker` and `src/mcp` are separate entry points.
 `src/shared` owns the browser-safe audit and job contracts consumed by both sides.
-`src/infrastructure` owns migrations and parameterized SQL; `src/demo` is the
+`src/infrastructure/sqlite` owns connections, migrations and parameterized SQL; `src/demo` is the
 local fixture. No network I/O happens inside database transactions. AuditService uses an owner-scoped
 AuditRepository; the trusted worker uses WorkerQueue; authentication uses
 TokenRepository. One SQLite implementation supplies all three interfaces.
@@ -143,6 +122,57 @@ can coexist with a completed audit. Claims and lease updates are atomic; writes
 require the current lease token and an unexpired lease. Retries clear obsolete
 results and publish a complete attempt atomically. See the decision notes for
 at-least-once execution and SQLite trade-offs.
+
+### Source layout
+
+- src/web: App composes ConnectionForm, AuditForm, RecentAudits and AuditDetail.
+- src/application/audit: discovery, document traversal and result assembly;
+  adapters/http-fetcher and adapters/browser-renderer contain Node/Playwright I/O.
+- src/cli: migration and token-provisioning executable entry points.
+- src/infrastructure/sqlite: repository implementation, connection setup and migrations.
+- src/shared: browser-safe contracts. API, worker and MCP retain separate entry points.
+- docs: demo, architecture decisions/ERD, MCP reference, operations and milestone checklist.
+
+### Engine names and coverage contract
+
+The reusable entry point is runAudit(url, options, hooks). maxUniqueResources
+limits deduplicated resources; defaultAuditLimits defines the defaults. The fetcher
+uses an explicit document/image/asset kind. Shared job records use AuditJob, and
+the browser API helper is requestAuditApi. toFetchMetadata is the single projection
+that strips response bodies and private transport bookkeeping.
+
+Coverage is now { complete, findings: [{ code, message }] }. Consumers should
+filter on code and display message. Codes are declared in src/shared/audit.ts;
+examples include resource-limit, candidate-limit, render-snapshot and
+browser-dependency-failed. Exact duplicate findings are deduplicated in discovery
+order. Messages can contain untrusted webpage-derived text.
+
+REST results and JSON exports use coverage.findings. MCP coverage items expose
+code/message and its summary uses coverageFindingCount. This replaces the previous
+reasons/reason/coverageReasonCount fields; update external consumers together. Restart
+API, worker and MCP processes, and reload the frontend after updating.
+Previously persisted coverage.reasons arrays are converted on read to legacy-notice
+findings without guessing codes from wording or modifying stored audit data.
+
+### Validation and public responses
+
+Shared Zod schemas in src/shared/inputs.ts and src/shared/scan.ts define audit
+URLs, scan defaults/limits, IDs, idempotency keys and pagination inputs, with
+inferred TypeScript types. The frontend, application service and MCP reuse them.
+REST decodes query strings before shared validation; MCP keeps its stricter
+response pagination and text/byte limits in its transport layer. The shared
+service still authenticates and applies the configured host policy.
+
+Shared AuditJob and ResultsResponse are public DTOs. Service responses explicitly
+project job fields, so REST no longer exposes ownerId, availableAt or leaseUntil.
+Internal repository/worker records retain those fields. External clients relying
+on them must update; no database migration is required for this change.
+
+JobError carries a typed application code and message, without an HTTP status.
+Existing codes such as invalid_request, job_not_found and idempotency_conflict
+are preserved for compatibility. The API maps codes to HTTP statuses; MCP maps
+them to sanitized tool error envelopes. UI and MCP counts both use summarizeAudit;
+engine response projection uses toFetchMetadata.
 
 ## API example (PowerShell)
 
@@ -192,7 +222,7 @@ Example tool workflow:
 
 The frontend's **MCP chat** uses the real stdio bridge with a small
 command parser, not AI. Try `Audit http://127.0.0.1:3105/`, `Check its status`,
-then `Show the issues`. [Full MCP schemas, pagination and setup](src/mcp/README.md).
+then `Show the issues`. [Full MCP schemas, pagination and setup](docs/MCP.md).
 Webpage strings are untrusted data, never instructions.
 
 ## Verification and logs
@@ -207,6 +237,15 @@ npm run build
 npm run check:all
 ```
 
+Oxlint correctness rules and Prettier checks run in check:all and CI. Run
+npm run format after edits. Formatting covers source, tests and executable scripts,
+including expanded lifecycle, transaction and error-handling code. Oxlint avoids
+an incompatible typescript-eslint peer dependency on this TypeScript 7 project.
+See [Oxlint configuration](https://oxc.rs/docs/guide/usage/linter/config) and
+[Prettier installation](https://prettier.io/docs/install).
+Shared browser runtime validation adds approximately 24 KB gzipped to the frontend
+bundle compared with the previous type-only validation approach.
+
 Dependency rules in .dependency-cruiser.json are enforced by check:all and CI,
 including type-only imports and re-exports. Web may import web/shared; application
 may import application/shared; shared may import only shared within src. Web/shared
@@ -214,9 +253,11 @@ cannot import Node built-ins. SWC parses TypeScript 7 for dependency-cruiser; th
 normal TypeScript compiler still checks types. A regression test deliberately
 violates the boundaries to prove the checker runs.
 
-Pure tests live in tests/unit (npm run test:unit); HTTP, database, browser-engine
-and child-process tests live in tests/integration (npm run test:integration).
-Playwright user workflows remain in tests/ui. npm test runs both Node suites.
+Tests are grouped by subsystem: engine, jobs, authorization, MCP, API, architecture,
+web and UI. Shared process/type fixtures stay in tests/helpers. npm run test:unit
+selects pure helper/contract tests; npm run test:integration selects HTTP, database,
+browser-engine and child-process tests. npm test runs every Node test;
+npm run test:ui runs the Playwright workflows.
 The tools tsconfig checks scripts/*.mjs with allowJs/checkJs as well as tests.
 The demo command parser lives in src/web because only the chat UI consumes it;
 src/demo remains the Node fixture website.
@@ -237,7 +278,7 @@ URLs; handle exports as private data.
 
 `.github/workflows/verify.yml` installs dependencies/browser libraries, type-checks,
 tests and builds on Node 24/Linux. It has read-only repository permissions and no
-publish/deploy step. It is prepared locally; a successful GitHub run is not claimed.
+publish/deploy step. A successful GitHub run is not claimed by local verification.
 
 ## Limits and honest demo boundaries
 

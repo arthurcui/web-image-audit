@@ -21,7 +21,10 @@ export function usePolling<T>(
         if (!live) return;
         setData(next);
         setLoading(false);
-        if (active(next)) timer = setTimeout(() => { void run(); }, 1500);
+        if (active(next))
+          timer = setTimeout(() => {
+            void run();
+          }, 1500);
       } catch (cause) {
         if (live) {
           setError(cause instanceof Error ? cause.message : 'Unable to load audits.');
@@ -30,7 +33,11 @@ export function usePolling<T>(
       }
     }
     void run();
-    return () => { live = false; controller.abort(); clearTimeout(timer); };
+    return () => {
+      live = false;
+      controller.abort();
+      clearTimeout(timer);
+    };
   }, [load, active, revision]);
   return { data, error, loading, refresh: () => setRevision((value) => value + 1) };
 }

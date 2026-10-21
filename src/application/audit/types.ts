@@ -8,7 +8,7 @@ export interface AuditOptions {
   maxPageBytes?: number;
   maxImageBytes?: number;
   oversizedBytes?: number;
-  maxImages?: number;
+  maxUniqueResources?: number;
   maxOccurrences?: number;
   maxCandidates?: number;
   maxRedirects?: number;
@@ -17,13 +17,13 @@ export interface AuditOptions {
   maxRetryDelayMs?: number;
 }
 
-export const defaults = {
+export const defaultAuditLimits = {
   concurrency: 4,
   requestTimeoutMs: 10_000,
   maxPageBytes: 2_000_000,
   maxImageBytes: 10_000_000,
   oversizedBytes: 500_000,
-  maxImages: 100,
+  maxUniqueResources: 100,
   maxOccurrences: 500,
   maxCandidates: 2000,
   maxRedirects: 5,
@@ -32,4 +32,4 @@ export const defaults = {
   maxRetryDelayMs: 5000,
 } as const;
 
-export type Limits = { [K in keyof typeof defaults]: number };
+export type Limits = { [K in keyof typeof defaultAuditLimits]: number };

@@ -2,7 +2,11 @@ import type { AuditRepository, WorkerQueue } from '../../src/application/jobs.js
 import type { TokenRepository } from '../../src/application/auth.js';
 
 // Compile-only assertions; this function is never executed.
-export function repositoryCapabilities(audits: AuditRepository, queue: WorkerQueue, tokens: TokenRepository) {
+export function repositoryCapabilities(
+  audits: AuditRepository,
+  queue: WorkerQueue,
+  tokens: TokenRepository,
+) {
   // @ts-expect-error Public reads require an owner.
   audits.get('id');
   // @ts-expect-error Results require an owner.
