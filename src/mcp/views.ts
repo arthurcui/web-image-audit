@@ -1,6 +1,6 @@
 import * as z from 'zod/v4';
-import type { AuditResult } from '../application/audit/types.js';
-import type { Job } from '../application/jobs.js';
+import type { AuditResult } from '../shared/audit.js';
+import type { Job } from '../shared/jobs.js';
 
 export const text = z.string().max(256);
 export const count = z.number().int().nonnegative();

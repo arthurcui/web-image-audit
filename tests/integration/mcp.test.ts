@@ -9,12 +9,12 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { SqliteJobStore } from '../src/infrastructure/job-store.js';
-import { provisionToken } from '../src/application/auth.js';
-import { AuditWorker } from '../src/worker/runner.js';
-import type { AuditResult } from '../src/application/audit/types.js';
+import { SqliteJobStore } from '../../src/infrastructure/job-store.js';
+import { provisionToken } from '../../src/application/auth.js';
+import { AuditWorker } from '../../src/worker/runner.js';
+import type { AuditResult } from '../../src/shared/audit.js';
 
-const main = fileURLToPath(new URL('../src/mcp/main.ts', import.meta.url));
+const main = fileURLToPath(new URL('../../src/mcp/main.ts', import.meta.url));
 async function setup(t: TestContext) {
   const directory = await mkdtemp(join(tmpdir(), 'wia-mcp-'));
   const path = join(directory, 'audit.sqlite');
@@ -172,7 +172,7 @@ test('MCP accepts bounded scan options and uses them in idempotency checks', asy
   const env = await setup(t); const { client } = await env.connect();
   const args = { url: 'https://example.com/', scan: { mode: 'crawl', includeIframes: true, maxPages: 2, maxDepth: 1 }, idempotencyKey: 'scan-options' };
   const id = data(await call(client, 'start_audit', args))['id'] as string;
-  assert.equal(env.store.get(id)?.scan?.mode, 'crawl');
+  assert.equal(env.store.get(id, 'alice')?.scan?.mode, 'crawl');
   assert.equal(data(await call(client, 'start_audit', args))['id'], id);
   assert.equal((await call(client, 'start_audit', { ...args, scan: { mode: 'static' } })).isError, true);
   assert.equal((await call(client, 'start_audit', { ...args, scan: { mode: 'crawl', maxPages: 21 } })).isError, true);

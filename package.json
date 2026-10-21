@@ -14,8 +14,8 @@
     "build": "npm run typecheck && tsc -p tsconfig.server.json && vite build",
     "start:api": "node --env-file-if-exists=.env dist/server/api/main.js",
     "preview": "vite preview",
-    "test": "tsx --test tests/*.test.ts",
-    "check": "npm test && npm run build",
+    "test": "tsx --test tests/unit/*.test.ts tests/integration/*.test.ts",
+    "check": "npm run check:boundaries && npm test && npm run build",
     "browser:install": "node scripts/install-browser.mjs",
     "dev:worker": "node --env-file-if-exists=.env --import tsx --watch src/worker/main.ts",
     "start:worker": "node --env-file-if-exists=.env dist/server/worker/main.js",
@@ -25,10 +25,13 @@
     "check:all": "npm run check && npm run test:ui",
     "dev:mcp": "node --env-file-if-exists=.env --import tsx src/mcp/main.ts",
     "start:mcp": "node --env-file-if-exists=.env dist/server/mcp/main.js",
-    "test:mcp": "tsx --test tests/mcp.test.ts",
+    "test:mcp": "tsx --test tests/integration/mcp.test.ts",
     "demo": "node scripts/demo.mjs",
     "demo:token": "node scripts/demo.mjs token",
-    "demo:mcp": "node scripts/demo.mjs mcp"
+    "demo:mcp": "node scripts/demo.mjs mcp",
+    "test:unit": "tsx --test tests/unit/*.test.ts",
+    "test:integration": "tsx --test tests/integration/*.test.ts",
+    "check:boundaries": "depcruise --config .dependency-cruiser.json src"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "2.3.1",
@@ -43,12 +46,14 @@
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
+    "@swc/core": "1.16.18",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
     "concurrently": "10.0.6",
+    "dependency-cruiser": "18.7.0",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vite": "8.3.4"

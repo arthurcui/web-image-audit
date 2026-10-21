@@ -1,18 +1,18 @@
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { browserExecutable } from '../src/application/audit/browser-config.js';
+import { browserExecutable } from '../../src/application/audit/browser-config.js';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { ServerResponse } from 'node:http';
 import test from 'node:test';
 import type { TestContext } from 'node:test';
-import { auditPage } from '../src/application/audit/index.js';
-import { renderFailure, RenderError } from '../src/application/audit/render.js';
-import { defaultScan } from '../src/shared/scan.js';
-import { SqliteJobStore } from '../src/infrastructure/job-store.js';
-import { AuditService } from '../src/application/audit-service.js';
-import { AuditWorker } from '../src/worker/runner.js';
+import { auditPage } from '../../src/application/audit/index.js';
+import { renderFailure, RenderError } from '../../src/application/audit/render.js';
+import { defaultScan } from '../../src/shared/scan.js';
+import { SqliteJobStore } from '../../src/infrastructure/job-store.js';
+import { AuditService } from '../../src/application/audit-service.js';
+import { AuditWorker } from '../../src/worker/runner.js';
 
 const html = (res: ServerResponse, body: string) => res.writeHead(200, { 'content-type': 'text/html' }).end(body);
 async function fixture(t: TestContext) {
@@ -94,7 +94,7 @@ test('scan settings persist, participate in idempotency, validate centrally and 
   const service = new AuditService(store, { authenticate: () => 'alice' }, ['example.com']);
   const scan = { ...defaultScan, mode: 'rendered' as const, includeIframes: true };
   const first = service.create('token', { url: 'https://example.com', scan }, 'key');
-  assert.deepEqual(store.get(first.job.id)?.scan, scan);
+  assert.deepEqual(store.get(first.job.id, 'alice')?.scan, scan);
   assert.equal(service.create('token', { url: 'https://example.com', scan }, 'key').job.id, first.job.id);
   assert.throws(() => service.create('token', { url: 'https://example.com' }, 'key'), /different audit payload/);
   assert.throws(() => service.create('token', { url: 'https://example.com', scan: { maxPages: 1000 } }), /Invalid scan/);
@@ -103,7 +103,7 @@ test('scan settings persist, participate in idempotency, validate centrally and 
     return { page: { url: 'https://example.com', state: 'ok', bytes: 0, bytesComplete: true, attempts: 1 }, occurrences: [], resources: [], issues: [], coverage: { complete: true, reasons: [] } };
   } });
   await worker.runOnce();
-  assert.equal(store.get(first.job.id)?.state, 'completed');
+  assert.equal(store.get(first.job.id, 'alice')?.state, 'completed');
 });
 
 

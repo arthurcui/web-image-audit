@@ -1,3 +1,6 @@
+import type { TokenRepository } from '../application/auth.js';
+import { workerStaleAfterMs } from '../application/readiness.js';
+import type { ReadinessStore } from '../application/readiness.js';
 import { defaultScan, parseScan } from '../shared/scan.js';
 import type { ScanOptions } from '../shared/scan.js';
 import Database from 'better-sqlite3';
@@ -6,8 +9,9 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { migrate } from './migrations.js';
 import { JobError } from '../application/jobs.js';
-import type { Attempt, Claim, Failure, Job, JobCursor, JobStore, Progress } from '../application/jobs.js';
-import type { AuditResult } from '../application/audit/types.js';
+import type { Claim, JobCursor, AuditRepository, WorkerQueue } from '../application/jobs.js';
+import type { Attempt, Failure, Job, Progress } from '../shared/jobs.js';
+import type { AuditResult } from '../shared/audit.js';
 
 interface Row {
   scan_json: string;
@@ -25,7 +29,7 @@ function job(row: Row): Job {
 }
 
 /** Every state-changing operation is synchronous and completes before any network I/O. */
-export class SqliteJobStore implements JobStore {
+export class SqliteJobStore implements AuditRepository, WorkerQueue, TokenRepository, ReadinessStore {
   private readonly db: Database.Database;
   constructor(path: string, private readonly now: () => number = Date.now) {
     if (path !== ':memory:') mkdirSync(dirname(resolve(path)), { recursive: true });
@@ -38,30 +42,52 @@ export class SqliteJobStore implements JobStore {
     } catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
+  probeReadiness() {
+    // Exercise the application schema and acquire a write lock without changing jobs.
+    // This is an access probe, not a disk-integrity or durability guarantee.
+    return this.db.transaction(() => {
+      this.db.prepare('SELECT id FROM jobs LIMIT 1').get();
+      this.db.prepare('UPDATE worker_heartbeats SET heartbeat_at=heartbeat_at WHERE 0').run();
+      const now = this.now();
+      const row = this.db.prepare('SELECT 1 FROM worker_heartbeats WHERE heartbeat_at > ? AND heartbeat_at <= ? LIMIT 1')
+        .get(now - workerStaleAfterMs, now);
+      return { workerReady: !!row };
+    }).immediate();
+  }
+  recordWorkerHeartbeat(id: string) {
+    this.db.transaction(() => {
+      const now = this.now();
+      this.db.prepare('DELETE FROM worker_heartbeats WHERE heartbeat_at <= ?').run(now - workerStaleAfterMs);
+      this.db.prepare('INSERT INTO worker_heartbeats(worker_id,heartbeat_at) VALUES (?,?) ON CONFLICT(worker_id) DO UPDATE SET heartbeat_at=excluded.heartbeat_at').run(id, now);
+    }).immediate();
+  }
+  removeWorkerHeartbeat(id: string) {
+    this.db.prepare('DELETE FROM worker_heartbeats WHERE worker_id=?').run(id);
+  }
   saveToken(hash: string, userId: string) {
     this.db.prepare('INSERT INTO bearer_tokens(token_hash,user_id,created_at) VALUES (?,?,?)').run(hash, userId, this.now());
   }
   tokenUser(hash: string) {
     return (this.db.prepare('SELECT user_id FROM bearer_tokens WHERE token_hash=?').get(hash) as { user_id: string } | undefined)?.user_id;
   }
-  // Unscoped access is internal to the trusted worker/admin repository, never a public transport API.
-  private row(id: string, ownerId?: string) {
-    return (ownerId === undefined
-      ? this.db.prepare('SELECT * FROM jobs WHERE id=?').get(id)
-      : this.db.prepare('SELECT * FROM jobs WHERE id=? AND owner_id=?').get(id, ownerId)) as Row | undefined;
+  private requireOwner(ownerId: string) {
+    if (typeof ownerId !== 'string' || ownerId.trim().length === 0) throw new TypeError('Owner ID is required');
   }
-  get(id: string, ownerId?: string) { const row = this.row(id, ownerId); return row ? job(row) : undefined; }
-  list(limit: number, ownerId?: string, before?: JobCursor) {
+  private row(id: string, ownerId: string) {
+    this.requireOwner(ownerId);
+    return this.db.prepare('SELECT * FROM jobs WHERE id=? AND owner_id=?').get(id, ownerId) as Row | undefined;
+  }
+  get(id: string, ownerId: string) { const row = this.row(id, ownerId); return row ? job(row) : undefined; }
+  list(limit: number, ownerId: string, before?: JobCursor) {
+    this.requireOwner(ownerId);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('limit must be 1..100');
-    if (before && ownerId !== undefined) {
+    if (before) {
       return (this.db.prepare('SELECT * FROM jobs WHERE owner_id=? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC,id DESC LIMIT ?')
         .all(ownerId, before.createdAt, before.createdAt, before.id, limit) as Row[]).map(job);
     }
-    return ((ownerId === undefined
-      ? this.db.prepare('SELECT * FROM jobs ORDER BY created_at DESC,id DESC LIMIT ?').all(limit)
-      : this.db.prepare('SELECT * FROM jobs WHERE owner_id=? ORDER BY created_at DESC,id DESC LIMIT ?').all(ownerId, limit)) as Row[]).map(job);
+    return (this.db.prepare('SELECT * FROM jobs WHERE owner_id=? ORDER BY created_at DESC,id DESC LIMIT ?').all(ownerId, limit) as Row[]).map(job);
   }
-  results(id: string, ownerId?: string) {
+  results(id: string, ownerId: string) {
     // One read transaction supplies a consistent status/result/history snapshot.
     return this.db.transaction(() => {
       const row = this.row(id, ownerId);
@@ -74,7 +100,8 @@ export class SqliteJobStore implements JobStore {
       return { job: job(row), result: row.result_json ? JSON.parse(row.result_json) as AuditResult : null, attempts };
     })();
   }
-  create(url: string, key?: string, ownerId = '__legacy__', scan: ScanOptions = defaultScan) {
+  create(url: string, key: string | undefined, ownerId: string, scan: ScanOptions = defaultScan) {
+    this.requireOwner(ownerId);
     const encodedScan = JSON.stringify(parseScan(scan));
     const scopedKey = key === undefined ? undefined : JSON.stringify([ownerId, key]);
     return this.db.transaction(() => {
@@ -90,7 +117,7 @@ export class SqliteJobStore implements JobStore {
       this.db.prepare(`INSERT INTO jobs
         (id,url,idempotency_key,state,max_attempts,created_at,updated_at,available_at,progress_json,owner_id,scan_json)
         VALUES (?,?,?,'queued',3,?,?,?,?,?,?)`).run(id, url, scopedKey ?? null, now, now, now, JSON.stringify(queued), ownerId, encodedScan);
-      return { job: this.get(id)!, replayed: false };
+      return { job: this.get(id, ownerId)!, replayed: false };
     }).immediate();
   }
   private owns(claim: Claim, now: number): boolean {
@@ -123,7 +150,7 @@ export class SqliteJobStore implements JobStore {
         JSON.stringify({ phase: 'fetching-page', inspected: 0, total: null }), row.id);
       this.db.prepare('INSERT INTO job_attempts(job_id,attempt,started_at) VALUES (?,?,?)')
         .run(row.id, row.attempts + 1, now);
-      return { job: this.get(row.id)!, token };
+      return { job: this.get(row.id, row.owner_id)!, token };
     }).immediate();
   }
   private checkLease(ms: number) {

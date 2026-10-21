@@ -1,3 +1,4 @@
+import { startWorkerPresence } from './presence.js';
 import { writeAuditLog } from './log.js';
 import { readConfig } from '../config.js';
 import { SqliteJobStore } from '../infrastructure/job-store.js';
@@ -10,10 +11,15 @@ const worker = new AuditWorker(store, {
   onEvent: writeAuditLog,
   onError: () => writeAuditLog({ event: 'worker_error' }),
 });
+let stopPresence = () => {};
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => {
   writeAuditLog({ event: 'worker_stopping' });
+  stopPresence();
   worker.stop();
 });
 writeAuditLog({ event: 'worker_started' });
-try { await worker.run(); }
-finally { store.close(); }
+try {
+  stopPresence = startWorkerPresence(store, () => writeAuditLog({ event: 'worker_error' }));
+  await worker.run();
+}
+finally { stopPresence(); store.close(); }

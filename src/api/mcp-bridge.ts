@@ -1,3 +1,4 @@
+// Lives in the API because its authenticated chat endpoint owns the MCP client process lifecycle.
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';

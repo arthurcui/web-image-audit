@@ -1,7 +1,8 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { auditPage } from '../application/audit/index.js';
-import type { AuditOptions, AuditResult } from '../application/audit/types.js';
-import type { JobStore } from '../application/jobs.js';
+import type { AuditOptions } from '../application/audit/types.js';
+import type { AuditResult } from '../shared/audit.js';
+import type { WorkerQueue } from '../application/jobs.js';
 
 import type { AuditLogEvent } from './log.js';
 type Audit = typeof auditPage;
@@ -23,7 +24,7 @@ export class AuditWorker {
   private readonly heartbeatMs: number;
   private readonly pollMs: number;
   private readonly audit: Audit;
-  constructor(private readonly store: JobStore, private readonly options: WorkerOptions) {
+  constructor(private readonly queue: WorkerQueue, private readonly options: WorkerOptions) {
     this.leaseMs = options.leaseMs ?? 30_000;
     this.heartbeatMs = options.heartbeatMs ?? 5000;
     this.pollMs = options.pollMs ?? 500;
@@ -46,33 +47,33 @@ export class AuditWorker {
   }
   async runOnce(): Promise<boolean> {
     if (this.stopping) return false;
-    const claim = this.store.claim(this.leaseMs);
+    const claim = this.queue.claim(this.leaseMs);
     if (!claim) return false;
     const emit = (event: AuditLogEvent['event'], resources?: number) => this.options.onEvent?.({ event, auditId: claim.job.id, attempt: claim.job.attempts, ...(resources === undefined ? {} : { resources }) });
     emit('audit_claimed');
     let lost = false;
     const heartbeat = setInterval(() => {
-      try { if (!this.store.heartbeat(claim, this.leaseMs)) lost = true; }
+      try { if (!this.queue.heartbeat(claim, this.leaseMs)) lost = true; }
       catch (error) { lost = true; this.options.onError?.(error); }
     }, this.heartbeatMs);
     try {
       const result = await this.audit(claim.job.url, { ...this.options.auditOptions, ...(claim.job.scan ? { scan: claim.job.scan } : {}) }, {
         onProgress: (progress) => {
-          if (!lost && !this.store.progress(claim, { phase: 'inspecting-images', ...progress })) lost = true;
+          if (!lost && !this.queue.progress(claim, { phase: 'inspecting-images', ...progress })) lost = true;
         },
       });
       if (lost) { emit('audit_lease_lost'); return true; }
       if (result.page.state === 'ok') {
-        emit(this.store.complete(claim, result) ? 'audit_completed' : 'audit_lease_lost', result.resources.length); // Individual image failures still complete the audit.
+        emit(this.queue.complete(claim, result) ? 'audit_completed' : 'audit_lease_lost', result.resources.length); // Individual image failures still complete the audit.
       } else {
         const failure = pageFailure(result);
         const retryAfter = result.page.retryAfterMs ?? 0;
-        const saved = this.store.fail(claim, failure,
+        const saved = this.queue.fail(claim, failure,
           Math.max(retryAfter <= 86_400_000 ? retryAfter : 0, 1000 * 2 ** (claim.job.attempts - 1)), result);
         emit(!saved ? 'audit_lease_lost' : failure.retryable && claim.job.attempts < claim.job.maxAttempts ? 'audit_retry' : 'audit_failed');
       }
     } catch (error) {
-      if (!lost) this.store.fail(claim, {
+      if (!lost) this.queue.fail(claim, {
         code: 'worker_error', message: error instanceof Error ? error.message.slice(0, 1000) : 'Unexpected worker failure', retryable: true,
       }, 1000 * 2 ** (claim.job.attempts - 1));
       emit('worker_error');

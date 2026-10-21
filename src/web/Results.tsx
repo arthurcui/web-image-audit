@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { AuditResult } from '../application/audit/types.js';
+import type { AuditResult } from '../shared/audit.js';
 import { altLabel, byteLabel, download, inventory, outcome, toCsv } from './inventory.js';
 
 export function Results({ result, id }: { result: AuditResult; id: string }) {

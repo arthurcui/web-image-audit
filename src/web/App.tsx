@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { Job } from '../application/jobs.js';
+import type { Job } from '../shared/jobs.js';
 import { isActive, request } from './client.js';
 import type { ResultsResponse } from './client.js';
 import { usePolling } from './usePolling.js';

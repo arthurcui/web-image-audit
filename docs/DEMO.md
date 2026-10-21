@@ -18,8 +18,8 @@ the request does not wait for network inspection.” Show the README diagram.
 ## 0:40–1:40 — Submit and explain results
 
 Submit http://127.0.0.1:3105/ as Static page, frames off. Wait for completed.
-Expected: 4 resources, 6 occurrences, 7 candidates. Point out the shared image
-with different alt attributes, responsive source candidate, 404 and padded large SVG.
+Expected: 5 resources, 6 occurrences, 7 candidates. Point out the shared image
+with different alt attributes, dedicated small responsive fallback, wide source, 404 and padded large SVG. Resize the fixture below/above 768 px to show the responsive switch; the oversized image displays at up to 1200 x 600.
 “One broken resource does not make the job fail; it makes coverage partial.”
 
 ## 1:40–2:30 — Review without overclaiming

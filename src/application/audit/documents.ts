@@ -4,7 +4,8 @@ import { createFetcher } from './fetch.js';
 import { renderDocument, renderFailure } from './render.js';
 import { createUrlPolicy } from './policy.js';
 import { parseScan } from '../../shared/scan.js';
-import type { AuditOptions, AuditResult, FetchResult, Limits } from './types.js';
+import type { AuditOptions, Limits } from './types.js';
+import type { AuditResult, FetchResult } from '../../shared/audit.js';
 
 type Task = { url: string; kind: 'page' | 'iframe'; depth: number; frameDepth: number; parentUrl?: string; inline?: string };
 export function publicMetadata(value: FetchResult): FetchResult {

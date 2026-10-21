@@ -1,5 +1,5 @@
-import type { Job, Attempt } from '../application/jobs.js';
-import type { AuditResult } from '../application/audit/types.js';
+import type { Job, Attempt } from '../shared/jobs.js';
+import type { AuditResult } from '../shared/audit.js';
 
 export interface ResultsResponse {
   id: string; state: Job['state']; available: boolean; result: AuditResult | null; attempts: Attempt[];

@@ -1,18 +1,20 @@
+import { getReadiness } from '../application/readiness.js';
+import type { ReadinessStore } from '../application/readiness.js';
 import Fastify from 'fastify';
 import { McpDemoBridge, demoCallSchema } from './mcp-bridge.js';
 import type { Writable } from 'node:stream';
 import { getHealth } from '../application/health.js';
 import { DemoAuth } from '../application/auth.js';
-import type { TokenStore } from '../application/auth.js';
+import type { TokenRepository } from '../application/auth.js';
 import { AuditService } from '../application/audit-service.js';
 import { JobError } from '../application/jobs.js';
-import type { JobStore } from '../application/jobs.js';
+import type { AuditRepository } from '../application/jobs.js';
 import { SqliteJobStore } from '../infrastructure/job-store.js';
 
 const origins = new Set(['http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:4173', 'http://localhost:4173']);
 const corsHeaders = new Set(['authorization', 'content-type', 'idempotency-key']);
 
-export function buildApp(options: { fixtureMode?: boolean; logger?: boolean; logStream?: Writable; store?: JobStore & TokenStore; approvedHosts?: readonly string[]; mcpDatabasePath?: string } = {}) {
+export function buildApp(options: { readinessStore?: ReadinessStore; fixtureMode?: boolean; logger?: boolean; logStream?: Writable; store?: AuditRepository & TokenRepository; approvedHosts?: readonly string[]; mcpDatabasePath?: string } = {}) {
   const app = Fastify({
     logger: options.logger ? {
       // Omit URLs, headers, and bodies, including on malformed/unauthenticated requests.
@@ -70,6 +72,10 @@ export function buildApp(options: { fixtureMode?: boolean; logger?: boolean; log
   app.options('/api/audits', async (_request, reply) => reply.code(204).send());
   app.options('/api/audits/*', async (_request, reply) => reply.code(204).send());
   app.setNotFoundHandler((_request, reply) => reply.code(404).send({ error: { code: 'not_found', message: 'Route not found' } }));
+  app.get('/api/ready', async (_request, reply) => {
+    const result = getReadiness(options.readinessStore ?? (store instanceof SqliteJobStore ? store : undefined));
+    return reply.code(result.status === 'ready' ? 200 : 503).send(result);
+  });
   app.get('/api/health', async () => ({ ...getHealth(), ...(options.fixtureMode ? { mode: 'fixture' } : {}) }));
   app.post<{ Body: { url: string } }>('/api/audits', {
     schema: { body: { type: 'object', additionalProperties: false, required: ['url'],

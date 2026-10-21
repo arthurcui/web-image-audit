@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { csvCell, inventory, toCsv } from '../src/web/inventory.js';
-import type { AuditResult } from '../src/application/audit/types.js';
+import { csvCell, inventory, toCsv } from '../../src/web/inventory.js';
+import type { AuditResult } from '../../src/shared/audit.js';
 
 test('CSV neutralizes formula prefixes, quotes, delimiters and line breaks', () => {
   for (const value of ['=SUM(1,2)', '+cmd', '-1+2', '@SUM(A1)', '  =1', '\t=1', '\rhello', '\nhello', '\u0001=1']) {

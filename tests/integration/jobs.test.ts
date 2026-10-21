@@ -1,5 +1,5 @@
 import type { InjectOptions } from 'fastify';
-import { provisionToken } from '../src/application/auth.js';
+import { provisionToken } from '../../src/application/auth.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -11,10 +11,10 @@ import { createServer } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 import test from 'node:test';
 import type { TestContext } from 'node:test';
-import { SqliteJobStore } from '../src/infrastructure/job-store.js';
-import { buildApp } from '../src/api/app.js';
-import { AuditWorker } from '../src/worker/runner.js';
-import type { AuditResult } from '../src/application/audit/types.js';
+import { SqliteJobStore } from '../../src/infrastructure/job-store.js';
+import { buildApp } from '../../src/api/app.js';
+import { AuditWorker } from '../../src/worker/runner.js';
+import type { AuditResult } from '../../src/shared/audit.js';
 
 async function database(t: TestContext) {
   const directory = await mkdtemp(join(tmpdir(), 'image-audit-jobs-'));
@@ -35,7 +35,7 @@ function successful(): AuditResult {
     occurrences: [], resources: [], issues: [], coverage: { complete: true, reasons: [] } };
 }
 async function processPair(t: TestContext, path: string, action: string): Promise<unknown[]> {
-  const children = [0, 1].map(() => fork(fileURLToPath(new URL('./helpers/job-process.ts', import.meta.url)),
+  const children = [0, 1].map(() => fork(fileURLToPath(new URL('../helpers/job-process.ts', import.meta.url)),
     [path, action], { execArgv: ['--import', 'tsx'], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] }));
   t.after(() => children.forEach((child) => { if (child.exitCode === null) child.kill(); }));
   const ready = children.map((child) => new Promise<void>((resolve, reject) => {
@@ -56,10 +56,10 @@ async function processPair(t: TestContext, path: string, action: string): Promis
 test('separate processes cannot claim the same job concurrently', { timeout: 10_000 }, async (t) => {
   const db = await database(t);
   const store = db.open();
-  store.create('https://example.com/');
+  store.create('https://example.com/', undefined, 'fixture-user');
   const results = await processPair(t, db.path, 'claim');
   assert.equal(results.filter(Boolean).length, 1);
-  assert.equal(store.list(10)[0]!.attempts, 1);
+  assert.equal(store.list(10, 'fixture-user')[0]!.attempts, 1);
 });
 
 test('concurrent idempotent creation returns one persisted job', { timeout: 10_000 }, async (t) => {
@@ -67,11 +67,11 @@ test('concurrent idempotent creation returns one persisted job', { timeout: 10_0
   const store = db.open();
   const results = await processPair(t, db.path, 'create') as Array<{ job: { id: string } }>;
   assert.equal(results[0]!.job.id, results[1]!.job.id);
-  assert.equal(store.list(100).length, 1);
-  assert.throws(() => store.create('https://example.com/different', 'shared-key'),
+  assert.equal(store.list(100, 'fixture-user').length, 1);
+  assert.throws(() => store.create('https://example.com/different', 'shared-key', 'fixture-user'),
     (error: unknown) => (error as { statusCode: number }).statusCode === 409);
   store.close();
-  assert.equal(db.open().create('https://example.com/', 'shared-key').job.id, results[0]!.job.id);
+  assert.equal(db.open().create('https://example.com/', 'shared-key', 'fixture-user').job.id, results[0]!.job.id);
 });
 
 test('expired leases reject all stale writes before and after recovery', async (t) => {
@@ -79,7 +79,7 @@ test('expired leases reject all stale writes before and after recovery', async (
   let now = 1000;
   const old = db.open(() => now);
   const fresh = db.open(() => now);
-  const created = old.create('https://example.com/');
+  const created = old.create('https://example.com/', undefined, 'fixture-user');
   const first = old.claim(100)!;
   now = 1100;
   assert.equal(old.heartbeat(first, 100), false);
@@ -96,7 +96,7 @@ test('expired leases reject all stale writes before and after recovery', async (
   assert.equal(old.progress(first, { phase: 'failed', inspected: 99, total: 99 }), false);
   assert.equal(fresh.complete(second, successful()), true);
   assert.equal(old.complete(first, successful()), false);
-  const saved = fresh.results(created.job.id)!;
+  const saved = fresh.results(created.job.id, 'fixture-user')!;
   assert.equal(saved.job.state, 'completed');
   assert.equal(saved.attempts[0]!.failure!.code, 'lease_expired');
   assert.equal(saved.attempts[1]!.outcome, 'completed');
@@ -105,7 +105,7 @@ test('expired leases reject all stale writes before and after recovery', async (
 test('a process that exits after claiming is recovered and repeated crashes exhaust attempts', { timeout: 10_000 }, async (t) => {
   const db = await database(t);
   const store = db.open();
-  store.create('https://example.com/');
+  store.create('https://example.com/', undefined, 'fixture-user');
   await processPair(t, db.path, 'claim');
   let now = Date.now() + 1000;
   const recovery = db.open(() => now);
@@ -116,7 +116,7 @@ test('a process that exits after claiming is recovered and repeated crashes exha
   assert.equal(third.job.attempts, 3);
   now += 100;
   assert.equal(recovery.claim(100), undefined);
-  const final = recovery.results(third.job.id)!;
+  const final = recovery.results(third.job.id, 'fixture-user')!;
   assert.equal(final.job.state, 'failed');
   assert.equal(final.attempts.length, 3);
   assert.ok(final.attempts.every((attempt) => attempt.failure?.code === 'lease_expired'));
@@ -126,21 +126,21 @@ test('retry scheduling and result publication never expose an obsolete attempt s
   const db = await database(t);
   let now = 0;
   const store = db.open(() => now);
-  const id = store.create('https://example.com/').job.id;
+  const id = store.create('https://example.com/', undefined, 'fixture-user').job.id;
   const first = store.claim(1000)!;
   const failedResult = successful();
   failedResult.page.state = 'failed';
   store.fail(first, { code: 'timeout', message: 'timeout', retryable: true }, 500, failedResult);
-  assert.equal(store.get(id)!.state, 'queued');
-  assert.equal(store.results(id)!.result, null);
+  assert.equal(store.get(id, 'fixture-user')!.state, 'queued');
+  assert.equal(store.results(id, 'fixture-user')!.result, null);
   assert.equal(store.claim(1000), undefined);
   now = 500;
   const second = store.claim(1000)!;
-  assert.equal(store.results(id)!.result, null);
+  assert.equal(store.results(id, 'fixture-user')!.result, null);
   store.complete(second, successful());
   assert.equal(store.complete(second, failedResult), false);
   store.close();
-  const restored = db.open().results(id)!;
+  const restored = db.open().results(id, 'fixture-user')!;
   assert.equal(restored.job.state, 'completed');
   assert.equal(restored.result!.page.state, 'ok');
   assert.equal(restored.attempts.length, 2);
@@ -150,7 +150,7 @@ test('worker drains current work, maintains heartbeats, and stops claiming new j
   const db = await database(t);
   const store = db.open();
   const contender = db.open();
-  const first = store.create('https://example.com/1').job;
+  const first = store.create('https://example.com/1', undefined, 'fixture-user').job;
   let release!: () => void;
   let started!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
@@ -164,18 +164,18 @@ test('worker drains current work, maintains heartbeats, and stops claiming new j
   worker.stop();
   await sleep(400);
   assert.equal(contender.claim(300), undefined, 'heartbeats keep the active claim alive while draining');
-  const second = store.create('https://example.com/2').job;
+  const second = store.create('https://example.com/2', undefined, 'fixture-user').job;
   release();
   await running;
-  assert.equal(store.get(first.id)!.state, 'completed');
-  assert.equal(store.get(second.id)!.state, 'queued');
+  assert.equal(store.get(first.id, 'fixture-user')!.state, 'completed');
+  assert.equal(store.get(second.id, 'fixture-user')!.state, 'queued');
 });
 
 test('worker records bounded failures and respects page Retry-After at the job layer', async (t) => {
   const db = await database(t);
   let now = 0;
   const store = db.open(() => now);
-  const id = store.create('https://example.com/').job.id;
+  const id = store.create('https://example.com/', undefined, 'fixture-user').job.id;
   const worker = new AuditWorker(store, {
     auditOptions: { approvedHosts: [] },
     audit: async () => ({ ...successful(), page: {
@@ -183,15 +183,15 @@ test('worker records bounded failures and respects page Retry-After at the job l
     } }),
   });
   await worker.runOnce();
-  assert.equal(store.get(id)!.availableAt, 20_000);
+  assert.equal(store.get(id, 'fixture-user')!.availableAt, 20_000);
   assert.equal(await worker.runOnce(), false);
   now = 20_000;
   await worker.runOnce();
   now = 40_000;
   await worker.runOnce();
-  assert.equal(store.get(id)!.state, 'failed');
-  assert.equal(store.get(id)!.attempts, 3);
-  assert.equal(store.results(id)!.result!.page.code, 'retry-after');
+  assert.equal(store.get(id, 'fixture-user')!.state, 'failed');
+  assert.equal(store.get(id, 'fixture-user')!.attempts, 3);
+  assert.equal(store.results(id, 'fixture-user')!.result!.page.code, 'retry-after');
 });
 
 test('API validates inputs, replays idempotency keys, and returns consistent errors', async (t) => {
@@ -265,12 +265,12 @@ test('real engine and worker publish partial-image audits as completed and page 
   assert.equal(result.state, 'completed');
   assert.equal(result.result.resources[0]!.state, 'failed');
   assert.equal(result.result.resources[1]!.state, 'ok');
-  assert.equal(store.get(id)!.progress.inspected, 2);
-  const failedId = store.create(origin + '/missing-page').job.id;
+  assert.equal(store.get(id, 'fixture-user')!.progress.inspected, 2);
+  const failedId = store.create(origin + '/missing-page', undefined, 'fixture-user').job.id;
   await worker.runOnce();
-  assert.equal(store.get(failedId)!.state, 'failed');
-  assert.equal(store.get(failedId)!.attempts, 1);
-  assert.equal(store.results(failedId)!.result!.page.status, 404);
+  assert.equal(store.get(failedId, 'fixture-user')!.state, 'failed');
+  assert.equal(store.get(failedId, 'fixture-user')!.attempts, 1);
+  assert.equal(store.results(failedId, 'fixture-user')!.result!.page.status, 404);
 });
 
 test('separate worker entry points consume the persistent queue against local HTTP fixtures', { timeout: 15_000 }, async (t) => {
@@ -286,16 +286,16 @@ test('separate worker entry points consume the persistent queue against local HT
   const origin = 'http://127.0.0.1:' + address.port;
   const db = await database(t);
   const store = db.open();
-  for (let i = 0; i < 4; i++) store.create(origin + '/' + i);
-  const children = [0, 1].map(() => fork(fileURLToPath(new URL('../src/worker/main.ts', import.meta.url)), [], {
+  for (let i = 0; i < 4; i++) store.create(origin + '/' + i, undefined, 'fixture-user');
+  const children = [0, 1].map(() => fork(fileURLToPath(new URL('../../src/worker/main.ts', import.meta.url)), [], {
     execArgv: ['--import', 'tsx'], stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
     env: { ...process.env, AUDIT_DB_PATH: db.path, AUDIT_APPROVED_HOSTS: new URL(origin).host },
   }));
   const exited = children.map((child) => new Promise<void>((resolve) => child.once('exit', () => resolve())));
   try {
     const deadline = Date.now() + 8000;
-    while (store.list(10).some((job) => job.state !== 'completed') && Date.now() < deadline) await sleep(25);
-    assert.ok(store.list(10).every((job) => job.state === 'completed' && job.attempts === 1));
+    while (store.list(10, 'fixture-user').some((job) => job.state !== 'completed') && Date.now() < deadline) await sleep(25);
+    assert.ok(store.list(10, 'fixture-user').every((job) => job.state === 'completed' && job.attempts === 1));
     assert.equal(pages, 4);
   } finally {
     children.forEach((child) => child.kill());

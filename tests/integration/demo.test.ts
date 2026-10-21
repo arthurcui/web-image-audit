@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createFixtureServer } from '../src/demo/fixture.js';
-import { readConfig } from '../src/config.js';
-import { auditPage } from '../src/application/audit/index.js';
-import { writeAuditLog } from '../src/worker/log.js';
-import { SqliteJobStore } from '../src/infrastructure/job-store.js';
-import { AuditWorker } from '../src/worker/runner.js';
-import { buildApp } from '../src/api/app.js';
-import { provisionToken } from '../src/application/auth.js';
+import { createFixtureServer } from '../../src/demo/fixture.js';
+import { readConfig } from '../../src/config.js';
+import { auditPage } from '../../src/application/audit/index.js';
+import { writeAuditLog } from '../../src/worker/log.js';
+import { SqliteJobStore } from '../../src/infrastructure/job-store.js';
+import { AuditWorker } from '../../src/worker/runner.js';
+import { buildApp } from '../../src/api/app.js';
+import { provisionToken } from '../../src/application/auth.js';
 import { Writable } from 'node:stream';
 
 test('demo fixture has deterministic findings and uses the normal strict fetch policy', async t => {
@@ -16,7 +16,7 @@ test('demo fixture has deterministic findings and uses the normal strict fetch p
   t.after(() => { server.closeAllConnections(); server.close(); });
   const host = '127.0.0.1:' + (server.address() as { port: number }).port;
   const result = await auditPage('http://' + host, { approvedHosts: [host] });
-  assert.equal(result.occurrences.length, 6); assert.equal(result.resources.length, 4);
+  assert.equal(result.occurrences.length, 6); assert.equal(result.resources.length, 5);
   assert.equal(result.occurrences.flatMap(o => o.candidates).length, 7);
   assert.equal(result.occurrences.filter(o => o.alt.state === 'missing').length, 1);
   assert.equal(result.occurrences.filter(o => o.alt.state === 'empty').length, 1);

@@ -1,28 +1,22 @@
 import type { ScanOptions } from '../shared/scan.js';
-import type { AuditResult } from './audit/types.js';
+import type { AuditResult } from '../shared/audit.js';
+import type { Job, Progress, Failure, Attempt } from '../shared/jobs.js';
 
-export type JobState = 'queued' | 'running' | 'completed' | 'failed';
-export interface Progress { phase: 'queued' | 'fetching-page' | 'inspecting-images' | 'completed' | 'failed'; inspected: number; total: number | null }
-export interface Failure { code: string; message: string; at: number; retryable: boolean }
-export interface Job {
-  scan?: ScanOptions;
-  id: string; ownerId: string; url: string; state: JobState; attempts: number; maxAttempts: number;
-  createdAt: number; updatedAt: number; availableAt: number; leaseUntil: number | null;
-  progress: Progress; lastError: Failure | null;
-}
 export interface JobCursor { createdAt: number; id: string }
 export interface Claim { job: Job; token: string }
-export interface Attempt {
-  attempt: number; startedAt: number; endedAt: number | null; outcome: string | null; failure: Failure | null;
-}
 export class JobError extends Error {
   constructor(public readonly statusCode: number, public readonly code: string, message: string) { super(message); }
 }
-export interface JobStore {
-  create(url: string, key?: string, ownerId?: string, scan?: ScanOptions): { job: Job; replayed: boolean };
-  get(id: string, ownerId?: string): Job | undefined;
-  list(limit: number, ownerId?: string, before?: JobCursor): Job[];
-  results(id: string, ownerId?: string): { job: Job; result: AuditResult | null; attempts: Attempt[] } | undefined;
+/** Owner-scoped persistence boundary for AuditService; every operation requires identity. */
+export interface AuditRepository {
+  create(url: string, key: string | undefined, ownerId: string, scan?: ScanOptions): { job: Job; replayed: boolean };
+  get(id: string, ownerId: string): Job | undefined;
+  list(limit: number, ownerId: string, before?: JobCursor): Job[];
+  results(id: string, ownerId: string): { job: Job; result: AuditResult | null; attempts: Attempt[] } | undefined;
+}
+
+/** Privileged cross-owner queue access. Inject only into trusted worker code. */
+export interface WorkerQueue {
   claim(leaseMs: number): Claim | undefined;
   heartbeat(claim: Claim, leaseMs: number): boolean;
   progress(claim: Claim, progress: Progress): boolean;

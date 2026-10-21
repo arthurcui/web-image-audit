@@ -1,0 +1,73 @@
+{
+  "forbidden": [
+    {
+      "name": "web-only-web-and-shared",
+      "severity": "error",
+      "from": {
+        "path": "^src/web/"
+      },
+      "to": {
+        "path": "^src/",
+        "pathNot": "^src/(web|shared)/"
+      }
+    },
+    {
+      "name": "application-only-application-and-shared",
+      "severity": "error",
+      "from": {
+        "path": "^src/application/"
+      },
+      "to": {
+        "path": "^src/",
+        "pathNot": "^src/(application|shared)/"
+      }
+    },
+    {
+      "name": "shared-only-shared",
+      "severity": "error",
+      "from": {
+        "path": "^src/shared/"
+      },
+      "to": {
+        "path": "^src/",
+        "pathNot": "^src/shared/"
+      }
+    },
+    {
+      "name": "browser-no-node-builtins",
+      "severity": "error",
+      "from": {
+        "path": "^src/(web|shared)/"
+      },
+      "to": {
+        "dependencyTypes": [
+          "core"
+        ]
+      }
+    },
+    {
+      "name": "no-unresolved-imports",
+      "severity": "error",
+      "from": {},
+      "to": {
+        "couldNotResolve": true
+      }
+    }
+  ],
+  "options": {
+    "doNotFollow": {
+      "path": "node_modules"
+    },
+    "parser": "swc",
+    "enhancedResolveOptions": {
+      "exportsFields": [
+        "exports"
+      ],
+      "conditionNames": [
+        "import",
+        "node",
+        "default"
+      ]
+    }
+  }
+}
