@@ -11,9 +11,13 @@ export function getReadiness(store?: ReadinessStore): ReadinessResponse {
   try {
     if (!store) throw new Error('Readiness store unavailable');
     const { workerReady } = store.probeReadiness();
-    return { status: workerReady ? 'ready' : 'not_ready', checks: {
-      database: 'ready', worker: workerReady ? 'ready' : 'unavailable',
-    } };
+    return {
+      status: workerReady ? 'ready' : 'not_ready',
+      checks: {
+        database: 'ready',
+        worker: workerReady ? 'ready' : 'unavailable',
+      },
+    };
   } catch {
     return { status: 'not_ready', checks: { database: 'unavailable', worker: 'unknown' } };
   }

@@ -1,18 +1,12 @@
-export interface ScanOptions {
-  mode: 'static' | 'rendered' | 'crawl';
-  includeIframes: boolean;
-  maxPages: number;
-  maxDepth: number;
-}
-export const defaultScan: ScanOptions = { mode: 'static', includeIframes: false, maxPages: 10, maxDepth: 2 };
+import * as z from 'zod/v4';
+export const scanSchema = z.strictObject({
+  mode: z.enum(['static', 'rendered', 'crawl']).default('static'),
+  includeIframes: z.boolean().default(false),
+  maxPages: z.number().int().min(1).max(20).default(10),
+  maxDepth: z.number().int().min(0).max(3).default(2),
+});
+export type ScanOptions = z.infer<typeof scanSchema>;
+export const defaultScan: ScanOptions = scanSchema.parse({});
 export function parseScan(value: unknown): ScanOptions {
-  if (value === undefined) return { ...defaultScan };
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid scan options');
-  const v = value as Record<string, unknown>;
-  if (Object.keys(v).some(k => !Object.hasOwn(defaultScan, k))) throw new Error('Unknown scan option');
-  const s = { ...defaultScan, ...v } as ScanOptions;
-  if (!['static', 'rendered', 'crawl'].includes(s.mode) || typeof s.includeIframes !== 'boolean'
-    || !Number.isInteger(s.maxPages) || s.maxPages < 1 || s.maxPages > 20
-    || !Number.isInteger(s.maxDepth) || s.maxDepth < 0 || s.maxDepth > 3) throw new Error('Invalid scan limits');
-  return s;
+  return scanSchema.parse(value === undefined ? {} : value);
 }

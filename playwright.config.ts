@@ -1,4 +1,4 @@
-import { browserExecutable } from './src/application/audit/browser-config.js';
+import { browserExecutable } from './src/application/audit/adapters/browser-config.js';
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/ui', testMatch: '**/*.spec.ts', fullyParallel: false, workers: 1,

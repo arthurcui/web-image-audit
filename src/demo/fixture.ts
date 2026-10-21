@@ -1,6 +1,10 @@
 import { createServer } from 'node:http';
-const svg = (label: string, width = 320, height = 160) => `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#285741"/><text x="20" y="${height / 2}" font-size="${width >= 1000 ? 36 : 18}" fill="white">${label}</text></svg>`;
-const large = svg('Oversized fixture - 600 KB+', 1200, 600).replace('</svg>', '<!--' + 'x'.repeat(600_000) + '--></svg>');
+const svg = (label: string, width = 320, height = 160) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#285741"/><text x="20" y="${height / 2}" font-size="${width >= 1000 ? 36 : 18}" fill="white">${label}</text></svg>`;
+const large = svg('Oversized fixture - 600 KB+', 1200, 600).replace(
+  '</svg>',
+  '<!--' + 'x'.repeat(600_000) + '--></svg>',
+);
 export function createFixtureServer() {
   return createServer((req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -20,12 +24,26 @@ export function createFixtureServer() {
         <a href="/dynamic.html">Optional rendered/iframe demonstration</a></body></html>`);
     } else if (path === '/dynamic.html') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.end('<!doctype html><title>LOCAL FIXTURE - rendered</title><body><h1>Rendered fixture</h1><script>setTimeout(()=>{const i=document.createElement("img");i.src="/shared.svg";i.alt="Inserted by JavaScript";document.body.append(i)},50)</script><iframe src="/frame.html" title="Fixture frame"></iframe></body>');
+      res.end(
+        '<!doctype html><title>LOCAL FIXTURE - rendered</title><body><h1>Rendered fixture</h1><script>setTimeout(()=>{const i=document.createElement("img");i.src="/shared.svg";i.alt="Inserted by JavaScript";document.body.append(i)},50)</script><iframe src="/frame.html" title="Fixture frame"></iframe></body>',
+      );
     } else if (path === '/frame.html') {
-      res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end('<!doctype html><title>Fixture frame</title><img src="/wide.svg" alt="Frame illustration">');
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.end(
+        '<!doctype html><title>Fixture frame</title><img src="/wide.svg" alt="Frame illustration">',
+      );
     } else if (['/shared.svg', '/small.svg', '/wide.svg', '/large.svg'].includes(path!)) {
       res.setHeader('Content-Type', 'image/svg+xml');
-      res.end(path === '/large.svg' ? large : path === '/wide.svg' ? svg('Wide responsive image', 1280, 640) : svg(path === '/small.svg' ? 'Small responsive fallback' : 'Shared image'));
-    } else { res.statusCode = 404; res.end('Intentional fixture 404'); }
+      res.end(
+        path === '/large.svg'
+          ? large
+          : path === '/wide.svg'
+            ? svg('Wide responsive image', 1280, 640)
+            : svg(path === '/small.svg' ? 'Small responsive fallback' : 'Shared image'),
+      );
+    } else {
+      res.statusCode = 404;
+      res.end('Intentional fixture 404');
+    }
   });
 }

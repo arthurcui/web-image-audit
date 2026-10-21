@@ -11,7 +11,7 @@ managed backups and availability, but adds credentials, service cost and operati
 ## Database schema
 
 The schema after migration 4 contains four application tables and one migration
-tracking table. Source: [migrations.ts](../src/infrastructure/migrations.ts).
+tracking table. Source: [migrations.ts](../src/infrastructure/sqlite/migrations.ts).
 
 ```mermaid
 erDiagram

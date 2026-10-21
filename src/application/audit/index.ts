@@ -1,18 +1,27 @@
+import { toFetchMetadata } from './metadata.js';
 import { collectDocuments } from './documents.js';
-import { createFetcher } from './fetch.js';
+import { createFetcher } from './adapters/http-fetcher.js';
 import { createUrlPolicy } from './policy.js';
-import { defaults } from './types.js';
+import { defaultAuditLimits } from './types.js';
 import type { AuditOptions, Limits } from './types.js';
-import type { AuditResult, FetchResult, Resource } from '../../shared/audit.js';
+import type { AuditResult, Resource } from '../../shared/audit.js';
 export type { AuditOptions } from './types.js';
-export type { AuditResult, Candidate, Occurrence, Resource, FetchResult } from '../../shared/audit.js';
+export type {
+  AuditResult,
+  Candidate,
+  Occurrence,
+  Resource,
+  FetchResult,
+} from '../../shared/audit.js';
 export { createUrlPolicy } from './policy.js';
 
 function getLimits(options: AuditOptions): Limits {
-  const limits = { ...defaults };
-  for (const key of Object.keys(defaults) as Array<keyof Limits>) {
-    const value = options[key] ?? defaults[key];
-    const minimum = ['maxRetries', 'maxRedirects', 'retryBaseMs', 'maxRetryDelayMs'].includes(key) ? 0 : 1;
+  const limits = { ...defaultAuditLimits };
+  for (const key of Object.keys(defaultAuditLimits) as Array<keyof Limits>) {
+    const value = options[key] ?? defaultAuditLimits[key];
+    const minimum = ['maxRetries', 'maxRedirects', 'retryBaseMs', 'maxRetryDelayMs'].includes(key)
+      ? 0
+      : 1;
     if (!Number.isSafeInteger(value) || value < minimum || value > 2_147_483_647) {
       throw new RangeError(key + ' must be a bounded integer >= ' + minimum);
     }
@@ -25,49 +34,64 @@ function getLimits(options: AuditOptions): Limits {
   return limits;
 }
 
-function metadata(result: FetchResult): FetchResult {
-  // Deliberately exclude body and private transport bookkeeping from public results.
-  const { url, state, bytes, bytesComplete, attempts, code, message, status, contentType, retryAfterMs } = result;
-  return { url, state, bytes, bytesComplete, attempts,
-    ...(code === undefined ? {} : { code }), ...(message === undefined ? {} : { message }),
-    ...(status === undefined ? {} : { status }), ...(contentType === undefined ? {} : { contentType }),
-    ...(retryAfterMs === undefined ? {} : { retryAfterMs }) };
-}
-
 /** Inspect a bounded set of static or rendered documents and deduplicate image resources globally. */
-export async function auditPage(pageUrl: string, options: AuditOptions, hooks: { onProgress?: (progress: { inspected: number; total: number }) => void } = {}): Promise<AuditResult> {
+export async function runAudit(
+  pageUrl: string,
+  options: AuditOptions,
+  hooks: { onProgress?: (progress: { inspected: number; total: number }) => void } = {},
+): Promise<AuditResult> {
   const limits = getLimits(options);
   const policy = createUrlPolicy(options.approvedHosts);
   const fetchResource = createFetcher(policy, limits);
-  const { result, reasons } = await collectDocuments(pageUrl, options, limits);
+  const { result, findings } = await collectDocuments(pageUrl, options, limits);
   const occurrences = result.occurrences;
   const resources = new Map<string, Resource>();
   for (const occurrence of occurrences) {
     if (occurrence.alt.state === 'missing') {
-      result.issues.push({ code: 'missing-alt', occurrenceId: occurrence.id,
-        message: 'Alt attribute is absent; review the image purpose and text alternative.' });
+      result.issues.push({
+        code: 'missing-alt',
+        occurrenceId: occurrence.id,
+        message: 'Alt attribute is absent; review the image purpose and text alternative.',
+      });
     }
     for (const candidate of occurrence.candidates) {
+      let skipCode: 'candidate-skipped' | 'resource-limit' = 'candidate-skipped';
       if (!candidate.skipped) {
-        try { candidate.url = policy(candidate.url ?? candidate.rawUrl, result.baseUrl).href; }
-        catch (error) { candidate.skipped = error instanceof Error ? error.message : 'URL rejected'; }
+        try {
+          candidate.url = policy(candidate.url ?? candidate.rawUrl, result.baseUrl).href;
+        } catch (error) {
+          candidate.skipped = error instanceof Error ? error.message : 'URL rejected';
+        }
       }
       if (candidate.url && !candidate.skipped) {
         let resource = resources.get(candidate.url);
         if (!resource) {
-          if (resources.size >= limits.maxImages) {
+          if (resources.size >= limits.maxUniqueResources) {
             candidate.skipped = 'Unique image resource limit reached';
+            skipCode = 'resource-limit';
           } else {
-            resource = { id: 'resource-' + resources.size, requestedUrl: candidate.url,
-              url: candidate.url, state: 'skipped', bytes: 0, bytesComplete: false, attempts: 0, oversized: false };
+            resource = {
+              id: 'resource-' + resources.size,
+              requestedUrl: candidate.url,
+              url: candidate.url,
+              state: 'skipped',
+              bytes: 0,
+              bytesComplete: false,
+              attempts: 0,
+              oversized: false,
+            };
             resources.set(candidate.url, resource);
           }
         }
         if (resource) candidate.resourceId = resource.id;
       }
       if (candidate.skipped) {
-        reasons.add(candidate.skipped);
-        result.issues.push({ code: 'skipped-url', occurrenceId: occurrence.id, message: candidate.skipped });
+        findings.add(skipCode, candidate.skipped);
+        result.issues.push({
+          code: 'skipped-url',
+          occurrenceId: occurrence.id,
+          message: candidate.skipped,
+        });
       }
     }
   }
@@ -79,7 +103,9 @@ export async function auditPage(pageUrl: string, options: AuditOptions, hooks: {
     while (next < result.resources.length) {
       const resource = result.resources[next++]!;
       const inspected = await fetchResource(resource.requestedUrl);
-      Object.assign(resource, metadata(inspected), { oversized: inspected.bytes > limits.oversizedBytes });
+      Object.assign(resource, toFetchMetadata(inspected), {
+        oversized: inspected.bytes > limits.oversizedBytes,
+      });
       hooks.onProgress?.({ inspected: ++inspectedCount, total: result.resources.length });
     }
   }
@@ -87,15 +113,23 @@ export async function auditPage(pageUrl: string, options: AuditOptions, hooks: {
   // Stable issue ordering independent of completion order.
   for (const resource of result.resources) {
     if (resource.state !== 'ok') {
-      reasons.add('Resource inspection incomplete: ' + (resource.code ?? resource.state));
-      result.issues.push({ code: resource.code ?? resource.state, resourceId: resource.id,
-        message: resource.message ?? 'Resource could not be inspected' });
+      findings.add(
+        'resource-incomplete',
+        'Resource inspection incomplete: ' + (resource.code ?? resource.state),
+      );
+      result.issues.push({
+        code: resource.code ?? resource.state,
+        resourceId: resource.id,
+        message: resource.message ?? 'Resource could not be inspected',
+      });
     }
-    if (resource.oversized) result.issues.push({
-      code: 'oversized-image', resourceId: resource.id,
-      message: 'Consumed image bytes exceed the configured threshold',
-    });
+    if (resource.oversized)
+      result.issues.push({
+        code: 'oversized-image',
+        resourceId: resource.id,
+        message: 'Consumed image bytes exceed the configured threshold',
+      });
   }
-  result.coverage = { complete: reasons.size === 0, reasons: [...reasons] };
+  result.coverage = { complete: findings.size === 0, findings: [...findings] };
   return result;
 }

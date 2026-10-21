@@ -1,8 +1,24 @@
 import type { ScanOptions } from './scan.js';
 
-export type FailureCode = 'policy' | 'invalid-url' | 'http' | 'content-type'
-  | 'encoding' | 'timeout' | 'network' | 'byte-limit' | 'redirect-limit'
-  | 'redirect-loop' | 'invalid-redirect' | 'retry-after' | 'render' | 'browser-missing' | 'browser-launch' | 'render-timeout' | 'render-navigation' | 'dom-limit';
+export type FailureCode =
+  | 'policy'
+  | 'invalid-url'
+  | 'http'
+  | 'content-type'
+  | 'encoding'
+  | 'timeout'
+  | 'network'
+  | 'byte-limit'
+  | 'redirect-limit'
+  | 'redirect-loop'
+  | 'invalid-redirect'
+  | 'retry-after'
+  | 'render'
+  | 'browser-missing'
+  | 'browser-launch'
+  | 'render-timeout'
+  | 'render-navigation'
+  | 'dom-limit';
 
 export interface FetchResult {
   url: string;
@@ -43,13 +59,49 @@ export interface Resource extends FetchResult {
   requestedUrl: string;
   oversized: boolean;
 }
+export const coverageCodes = [
+  'invalid-base',
+  'occurrence-limit',
+  'candidate-limit',
+  'document-deadline',
+  'document-failed',
+  'crawl-origin-rejected',
+  'render-failed',
+  'linked-document-rejected',
+  'crawl-limit',
+  'iframe-limit',
+  'inline-iframe-limit',
+  'iframes-excluded',
+  'render-snapshot',
+  'script-navigation-blocked',
+  'browser-request-blocked',
+  'browser-request-limit',
+  'browser-dependency-failed',
+  'resource-limit',
+  'candidate-skipped',
+  'resource-incomplete',
+  'legacy-notice',
+] as const;
+export type CoverageCode = (typeof coverageCodes)[number];
+export interface CoverageFinding {
+  code: CoverageCode;
+  message: string;
+}
+
 export interface AuditResult {
   page: FetchResult;
   scan?: ScanOptions;
-  documents?: Array<{ id: string; url: string; kind: 'page' | 'iframe'; depth: number; parentUrl?: string; state: string }>;
+  documents?: Array<{
+    id: string;
+    url: string;
+    kind: 'page' | 'iframe';
+    depth: number;
+    parentUrl?: string;
+    state: string;
+  }>;
   baseUrl?: string;
   occurrences: Occurrence[];
   resources: Resource[];
   issues: Array<{ code: string; occurrenceId?: string; resourceId?: string; message: string }>;
-  coverage: { complete: boolean; reasons: string[] };
+  coverage: { complete: boolean; findings: CoverageFinding[] };
 }

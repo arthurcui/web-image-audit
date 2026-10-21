@@ -11,21 +11,27 @@ export function tokenHash(token: string) {
 /** Provisioning is a trusted local operation, never an HTTP endpoint. */
 export function provisionToken(store: TokenRepository, userId: string): string {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(userId)) {
-    throw new Error('User ID must start with a letter or digit and contain at most 64 letters, digits, dots, underscores, or hyphens');
+    throw new Error(
+      'User ID must start with a letter or digit and contain at most 64 letters, digits, dots, underscores, or hyphens',
+    );
   }
   const token = 'wia_' + randomBytes(32).toString('base64url');
   store.saveToken(tokenHash(token), userId);
   return token;
 }
-export interface Authenticator { authenticate(authorization: unknown): string }
+export interface Authenticator {
+  authenticate(authorization: unknown): string;
+}
 export class DemoAuth implements Authenticator {
   constructor(private readonly store: TokenRepository) {}
   authenticate(authorization: unknown): string {
-    const match = typeof authorization === 'string'
-      ? /^Bearer (wia_[A-Za-z0-9_-]{43})$/i.exec(authorization) : null;
+    const match =
+      typeof authorization === 'string'
+        ? /^Bearer (wia_[A-Za-z0-9_-]{43})$/i.exec(authorization)
+        : null;
     const userId = match ? this.store.tokenUser(tokenHash(match[1]!)) : undefined;
     if (!userId || userId === '__legacy__') {
-      throw new JobError(401, 'unauthorized', 'A valid bearer token is required');
+      throw new JobError('unauthorized', 'A valid bearer token is required');
     }
     return userId;
   }

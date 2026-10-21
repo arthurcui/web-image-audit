@@ -1,25 +1,32 @@
-import type { Job, Attempt } from '../shared/jobs.js';
-import type { AuditResult } from '../shared/audit.js';
+import type { AuditJob } from '../shared/jobs.js';
+export type { ResultsResponse } from '../shared/jobs.js';
 
-export interface ResultsResponse {
-  id: string; state: Job['state']; available: boolean; result: AuditResult | null; attempts: Attempt[];
-}
-export const isActive = (job: Job) => job.state === 'queued' || job.state === 'running';
+export const isActive = (job: AuditJob) => job.state === 'queued' || job.state === 'running';
 
-export async function request<T>(token: string, path: string, signal: AbortSignal, init: RequestInit = {}): Promise<T> {
+export async function requestAuditApi<T>(
+  token: string,
+  path: string,
+  signal: AbortSignal,
+  init: RequestInit = {},
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch('/api/audits' + path, {
-      ...init, signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
-      cache: 'no-store', redirect: 'error',
+      ...init,
+      signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
+      cache: 'no-store',
+      redirect: 'error',
       headers: { ...init.headers, Authorization: 'Bearer ' + token },
     });
   } catch {
     throw new Error('Could not reach the local API within 10 seconds. Check the API and retry.');
   }
   if (!response.ok) {
-    if (response.status === 401) throw new Error('Token not accepted. Disconnect and enter a valid demo token.');
-    const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    if (response.status === 401)
+      throw new Error('Token not accepted. Disconnect and enter a valid demo token.');
+    const body = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
     throw new Error(body?.error?.message ?? 'Request failed (HTTP ' + response.status + ').');
   }
   return response.json() as Promise<T>;

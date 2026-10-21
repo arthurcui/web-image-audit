@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Route } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import type { Job } from '../../src/shared/jobs.js';
+import type { AuditJob } from '../../src/shared/jobs.js';
 import { fixtureToken, fixtureUrl } from './fixture.js';
 
 async function connect(page: Page) {
@@ -12,33 +12,63 @@ async function connect(page: Page) {
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Start audit', exact: true })).toBeVisible();
 }
-function job(id: string, state: Job['state'] = 'completed'): Job {
-  return { id, ownerId: 'test', url: 'https://example.com/' + id, state, createdAt: Date.now(), updatedAt: Date.now(),
-    availableAt: 0, leaseUntil: null, attempts: 1, maxAttempts: 3, lastError: null,
-    progress: { phase: state === 'running' ? 'inspecting-images' : state, inspected: 0, total: null } };
+function job(id: string, state: AuditJob['state'] = 'completed'): AuditJob {
+  return {
+    id,
+    url: 'https://example.com/' + id,
+    state,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    attempts: 1,
+    maxAttempts: 3,
+    lastError: null,
+    progress: {
+      phase: state === 'running' ? 'inspecting-images' : state,
+      inspected: 0,
+      total: null,
+    },
+  };
 }
 const first = '11111111-1111-4111-8111-111111111111';
 const second = '22222222-2222-4222-8222-222222222222';
-const emptyResult = { page: { url: 'https://example.com', state: 'ok', bytes: 0, bytesComplete: true, attempts: 1 },
-  occurrences: [], resources: [], issues: [], coverage: { complete: true, reasons: [] } };
+const emptyResult = {
+  page: { url: 'https://example.com', state: 'ok', bytes: 0, bytesComplete: true, attempts: 1 },
+  occurrences: [],
+  resources: [],
+  issues: [],
+  coverage: { complete: true, findings: [] },
+};
 async function respond(route: Route, value: unknown, status = 200) {
   await route.fulfill({ status, json: value });
 }
 
-test('real submit → separate worker → results, filters, exports and memory-only credentials', async ({ page }, info) => {
+test('real submit → separate worker → results, filters, exports and memory-only credentials', async ({
+  page,
+}, info) => {
   const previewRequests: string[] = [];
-  page.on('request', (req) => { if (req.resourceType() === 'image' || req.url().startsWith('http://127.0.0.1:3102')) previewRequests.push(req.url()); });
+  page.on('request', (req) => {
+    if (req.resourceType() === 'image' || req.url().startsWith('http://127.0.0.1:3102'))
+      previewRequests.push(req.url());
+  });
   await connect(page);
   await page.getByLabel('Webpage URL').fill(fixtureUrl);
   await page.getByRole('button', { name: 'Start audit' }).click();
   await expect(page.getByRole('heading', { name: 'Audit detail' })).toBeFocused();
-  await expect(page.getByRole('heading', { name: 'Image inventory' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Image inventory' })).toBeVisible({
+    timeout: 20_000,
+  });
   const detail = page.getByRole('region', { name: 'Audit detail', exact: true });
-  await expect(detail.locator('.metrics div').filter({ hasText: 'Unique resources' }).locator('dd')).toHaveText('3');
-  await expect(detail.locator('.metrics div').filter({ hasText: 'HTML occurrences' }).locator('dd')).toHaveText('4');
+  await expect(
+    detail.locator('.metrics div').filter({ hasText: 'Unique resources' }).locator('dd'),
+  ).toHaveText('3');
+  await expect(
+    detail.locator('.metrics div').filter({ hasText: 'HTML occurrences' }).locator('dd'),
+  ).toHaveText('4');
   await expect(detail.getByText('Partial coverage', { exact: true })).toBeVisible();
   await expect(page.locator('tbody tr')).toHaveCount(5);
-  await expect(page.getByRole('cell', { name: 'Empty alt (possibly decorative)', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('cell', { name: 'Empty alt (possibly decorative)', exact: true }),
+  ).toBeVisible();
   await page.getByLabel('Filter inventory').selectOption('missing');
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await page.getByLabel('Filter inventory').selectOption('oversized');
@@ -57,11 +87,18 @@ test('real submit → separate worker → results, filters, exports and memory-o
   const jsonEvent = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export JSON' }).click();
   const json = await jsonEvent;
-  const exported = JSON.parse(await readFile((await json.path())!, 'utf8')) as { resources: unknown[] };
+  const exported = JSON.parse(await readFile((await json.path())!, 'utf8')) as {
+    resources: unknown[];
+  };
   expect(exported.resources).toHaveLength(3);
   expect(previewRequests).toEqual([]);
-  expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length, cookie: document.cookie })))
-    .toEqual({ local: 0, session: 0, cookie: '' });
+  expect(
+    await page.evaluate(() => ({
+      local: localStorage.length,
+      session: sessionStorage.length,
+      cookie: document.cookie,
+    })),
+  ).toEqual({ local: 0, session: 0, cookie: '' });
 
   await page.getByLabel('Filter inventory').selectOption('all');
   await page.screenshot({ path: info.outputPath('results-desktop.png'), fullPage: true });
@@ -72,7 +109,9 @@ test('real submit → separate worker → results, filters, exports and memory-o
   await scroll.focus();
   await page.keyboard.press('ArrowRight');
   await expect.poll(() => scroll.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-  await scroll.evaluate((element) => { element.scrollLeft = 0; });
+  await scroll.evaluate((element) => {
+    element.scrollLeft = 0;
+  });
   await page.screenshot({ path: info.outputPath('results-mobile.png'), fullPage: true });
   await page.reload();
   await expect(page.getByLabel('Local demo token')).toHaveValue('');
@@ -85,8 +124,18 @@ test('invalid token, form validation, empty results and retryable API errors', a
   await page.route('**/api/audits**', async (route) => {
     const url = new URL(route.request().url());
     if (invalid) return respond(route, { error: { message: 'Unauthorized' } }, 401);
-    if (route.request().method() === 'POST') { posts++; return respond(route, { error: { message: 'Host not approved' } }, 400); }
-    if (url.pathname.endsWith('/results')) return respond(route, { result: emptyResult, available: true, state: 'completed', id: first, attempts: [] });
+    if (route.request().method() === 'POST') {
+      posts++;
+      return respond(route, { error: { message: 'Host not approved' } }, 400);
+    }
+    if (url.pathname.endsWith('/results'))
+      return respond(route, {
+        result: emptyResult,
+        available: true,
+        state: 'completed',
+        id: first,
+        attempts: [],
+      });
     if (url.pathname.endsWith(first)) {
       if (detailError) return respond(route, { error: { message: 'Temporary failure' } }, 503);
       return respond(route, job(first));
@@ -114,20 +163,27 @@ test('invalid token, form validation, empty results and retryable API errors', a
   await expect(page.getByRole('button', { name: 'Retry details' })).toBeVisible();
   detailError = false;
   await page.getByRole('button', { name: 'Retry details' }).click();
-  await expect(page.getByText('No image occurrences found in the inspected documents.')).toBeVisible();
+  await expect(
+    page.getByText('No image occurrences found in the inspected documents.'),
+  ).toBeVisible();
   await page.getByLabel('Filter inventory').selectOption('missing');
-  await expect(page.getByText('No image occurrences found in the inspected documents.')).toBeVisible();
+  await expect(
+    page.getByText('No image occurrences found in the inspected documents.'),
+  ).toBeVisible();
 });
 
 test('polls active jobs only and stops after completion and disconnect', async ({ page }) => {
-  let state: Job['state'] = 'running';
+  let state: AuditJob['state'] = 'running';
   let calls = 0;
   let details = 0;
   await page.route('**/api/audits**', async (route) => {
     calls++;
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith('/results')) return respond(route, { result: emptyResult, available: true });
-    if (path.endsWith(first)) { details++; return respond(route, job(first, state)); }
+    if (path.endsWith(first)) {
+      details++;
+      return respond(route, job(first, state));
+    }
     return respond(route, { jobs: [job(first, state)] });
   });
   await connect(page);
@@ -135,7 +191,9 @@ test('polls active jobs only and stops after completion and disconnect', async (
   await expect(page.getByRole('progressbar')).toBeVisible();
   await expect.poll(() => details).toBeGreaterThan(1);
   state = 'completed';
-  await expect(page.getByText('No image occurrences found in the inspected documents.')).toBeVisible();
+  await expect(
+    page.getByText('No image occurrences found in the inspected documents.'),
+  ).toBeVisible();
   await expect(page.locator('.recent .badge')).toHaveText('completed');
   const finished = calls;
   await page.waitForTimeout(1800);
@@ -146,7 +204,9 @@ test('polls active jobs only and stops after completion and disconnect', async (
   expect(calls).toBe(finished);
 });
 
-test('switching audits discards a late response; closing detail cancels polling', async ({ page }) => {
+test('switching audits discards a late response; closing detail cancels polling', async ({
+  page,
+}) => {
   let release: (() => void) | undefined;
   let slowStarted = false;
   let secondCalls = 0;
@@ -154,10 +214,15 @@ test('switching audits discards a late response; closing detail cancels polling'
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith(first)) {
       slowStarted = true;
-      await new Promise<void>((resolve) => { release = resolve; });
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
       return respond(route, job(first)).catch(() => {});
     }
-    if (path.endsWith(second)) { secondCalls++; return respond(route, job(second, 'running')); }
+    if (path.endsWith(second)) {
+      secondCalls++;
+      return respond(route, job(second, 'running'));
+    }
     return respond(route, { jobs: [job(first), job(second)] });
   });
   await connect(page);
@@ -175,7 +240,9 @@ test('switching audits discards a late response; closing detail cancels polling'
   await expect(page.getByRole('heading', { name: 'Your findings, in focus' })).toBeVisible();
 });
 
-test('uncertain submission retries reuse the idempotency key and failed jobs stop polling', async ({ page }) => {
+test('uncertain submission retries reuse the idempotency key and failed jobs stop polling', async ({
+  page,
+}) => {
   const keys: Array<string | undefined> = [];
   let reads = 0;
   await page.route('**/api/audits**', async (route) => {
@@ -188,7 +255,10 @@ test('uncertain submission retries reuse the idempotency key and failed jobs sto
     if (path.endsWith('/results')) return respond(route, { result: null, available: false });
     if (path.endsWith(first)) {
       reads++;
-      return respond(route, { ...job(first, 'failed'), lastError: { code: 'http', message: 'Page unavailable', retryable: false, at: Date.now() } });
+      return respond(route, {
+        ...job(first, 'failed'),
+        lastError: { code: 'http', message: 'Page unavailable', retryable: false, at: Date.now() },
+      });
     }
     return respond(route, { jobs: [] });
   });
@@ -208,12 +278,17 @@ test('uncertain submission retries reuse the idempotency key and failed jobs sto
   expect(reads).toBe(stopped);
 });
 
-test('disconnect during active polling clears private content and stops requests', async ({ page }) => {
+test('disconnect during active polling clears private content and stops requests', async ({
+  page,
+}) => {
   let calls = 0;
   await page.route('**/api/audits**', async (route) => {
     calls++;
     const path = new URL(route.request().url()).pathname;
-    return respond(route, path.endsWith(first) ? job(first, 'running') : { jobs: [job(first, 'running')] });
+    return respond(
+      route,
+      path.endsWith(first) ? job(first, 'running') : { jobs: [job(first, 'running')] },
+    );
   });
   await connect(page);
   await page.getByRole('button', { name: new RegExp(first) }).click();
@@ -226,7 +301,9 @@ test('disconnect during active polling clears private content and stops requests
   await expect(page.getByText('https://example.com/' + first, { exact: true })).toHaveCount(0);
 });
 
-test('rendered crawl form reaches worker and exposes document provenance', async ({ page }, info) => {
+test('rendered crawl form reaches worker and exposes document provenance', async ({
+  page,
+}, info) => {
   await connect(page);
   await page.getByLabel('Webpage URL').fill('http://127.0.0.1:3102/render-root');
   await page.getByLabel('Scan mode').selectOption('crawl');
@@ -234,9 +311,15 @@ test('rendered crawl form reaches worker and exposes document provenance', async
   await page.getByLabel('Maximum pages').fill('2');
   await page.getByLabel('Maximum link depth').fill('1');
   await page.getByRole('button', { name: 'Start audit' }).click();
-  await expect(page.getByRole('heading', { name: 'Image inventory' })).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('.metrics div').filter({ hasText: 'Unique resources' }).locator('dd')).toHaveText('1');
-  await expect(page.locator('.metrics div').filter({ hasText: 'HTML occurrences' }).locator('dd')).toHaveText('3');
+  await expect(page.getByRole('heading', { name: 'Image inventory' })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(
+    page.locator('.metrics div').filter({ hasText: 'Unique resources' }).locator('dd'),
+  ).toHaveText('1');
+  await expect(
+    page.locator('.metrics div').filter({ hasText: 'HTML occurrences' }).locator('dd'),
+  ).toHaveText('3');
   await expect(page.locator('tbody')).toContainText('Dynamic image');
   await expect(page.locator('tbody')).toContainText('/render-frame');
   await page.getByText('3 documents · crawl scan', { exact: true }).click();
