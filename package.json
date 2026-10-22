@@ -34,7 +34,8 @@
     "check:boundaries": "depcruise --config .dependency-cruiser.json src",
     "lint": "oxlint --deny-warnings src tests scripts",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"scripts/*.mjs\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"scripts/*.mjs\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"scripts/*.mjs\"",
+    "benchmark:results": "node --expose-gc --import tsx scripts/benchmark-results.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "2.3.1",

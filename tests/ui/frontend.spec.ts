@@ -1,7 +1,9 @@
+import { summarizeAudit } from '../../src/shared/summary.js';
+import type { AuditResult } from '../../src/shared/audit.js';
 import { test, expect } from '@playwright/test';
 import type { Page, Route } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import type { AuditJob } from '../../src/shared/jobs.js';
+import type { AuditJob, AuditStatus } from '../../src/shared/jobs.js';
 import { fixtureToken, fixtureUrl } from './fixture.js';
 
 async function connect(page: Page) {
@@ -12,7 +14,7 @@ async function connect(page: Page) {
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Start audit', exact: true })).toBeVisible();
 }
-function job(id: string, state: AuditJob['state'] = 'completed'): AuditJob {
+function job(id: string, state: AuditJob['state'] = 'completed'): AuditStatus {
   return {
     id,
     url: 'https://example.com/' + id,
@@ -22,6 +24,24 @@ function job(id: string, state: AuditJob['state'] = 'completed'): AuditJob {
     attempts: 1,
     maxAttempts: 3,
     lastError: null,
+    publishedResult:
+      state === 'completed'
+        ? {
+            attempt: 1,
+            summary: summarizeAudit(emptyResult),
+            metadata: { page: emptyResult.page, coverage: { complete: true } },
+            counts: {
+              summary: 0,
+              resources: 0,
+              occurrences: 0,
+              candidates: 0,
+              issues: 0,
+              documents: 0,
+              coverage: 0,
+              inventory: 0,
+            },
+          }
+        : null,
     progress: {
       phase: state === 'running' ? 'inspecting-images' : state,
       inspected: 0,
@@ -31,7 +51,7 @@ function job(id: string, state: AuditJob['state'] = 'completed'): AuditJob {
 }
 const first = '11111111-1111-4111-8111-111111111111';
 const second = '22222222-2222-4222-8222-222222222222';
-const emptyResult = {
+const emptyResult: AuditResult = {
   page: { url: 'https://example.com', state: 'ok', bytes: 0, bytesComplete: true, attempts: 1 },
   occurrences: [],
   resources: [],
@@ -128,19 +148,18 @@ test('invalid token, form validation, empty results and retryable API errors', a
       posts++;
       return respond(route, { error: { message: 'Host not approved' } }, 400);
     }
-    if (url.pathname.endsWith('/results'))
+    if (['/images', '/documents', '/issues'].some((p) => url.pathname.endsWith(p)))
       return respond(route, {
-        result: emptyResult,
-        available: true,
-        state: 'completed',
-        id: first,
-        attempts: [],
+        attempt: 1,
+        items: [],
+        total: 0,
+        page: { nextCursor: null, hasMore: false },
       });
     if (url.pathname.endsWith(first)) {
       if (detailError) return respond(route, { error: { message: 'Temporary failure' } }, 503);
       return respond(route, job(first));
     }
-    return respond(route, { jobs: [job(first)] });
+    return respond(route, { items: [job(first)], page: { nextCursor: null, hasMore: false } });
   });
   await page.goto('/');
   await page.getByLabel('Local demo token').fill('invalid');
@@ -179,12 +198,21 @@ test('polls active jobs only and stops after completion and disconnect', async (
   await page.route('**/api/audits**', async (route) => {
     calls++;
     const path = new URL(route.request().url()).pathname;
-    if (path.endsWith('/results')) return respond(route, { result: emptyResult, available: true });
+    if (['/images', '/documents', '/issues'].some((p) => path.endsWith(p)))
+      return respond(route, {
+        attempt: 1,
+        items: [],
+        total: 0,
+        page: { nextCursor: null, hasMore: false },
+      });
     if (path.endsWith(first)) {
       details++;
       return respond(route, job(first, state));
     }
-    return respond(route, { jobs: [job(first, state)] });
+    return respond(route, {
+      items: [job(first, state)],
+      page: { nextCursor: null, hasMore: false },
+    });
   });
   await connect(page);
   await page.getByRole('button', { name: new RegExp(first) }).click();
@@ -223,7 +251,10 @@ test('switching audits discards a late response; closing detail cancels polling'
       secondCalls++;
       return respond(route, job(second, 'running'));
     }
-    return respond(route, { jobs: [job(first), job(second)] });
+    return respond(route, {
+      items: [job(first), job(second)],
+      page: { nextCursor: null, hasMore: false },
+    });
   });
   await connect(page);
   await page.getByRole('button', { name: new RegExp(first) }).click();
@@ -252,7 +283,6 @@ test('uncertain submission retries reuse the idempotency key and failed jobs sto
       if (keys.length === 1) return route.abort();
       return respond(route, { id: first }, 202);
     }
-    if (path.endsWith('/results')) return respond(route, { result: null, available: false });
     if (path.endsWith(first)) {
       reads++;
       return respond(route, {
@@ -260,7 +290,7 @@ test('uncertain submission retries reuse the idempotency key and failed jobs sto
         lastError: { code: 'http', message: 'Page unavailable', retryable: false, at: Date.now() },
       });
     }
-    return respond(route, { jobs: [] });
+    return respond(route, { items: [], page: { nextCursor: null, hasMore: false } });
   });
   await connect(page);
   await expect(page.getByText('No audits yet. Submit your first page above.')).toBeVisible();
@@ -287,7 +317,9 @@ test('disconnect during active polling clears private content and stops requests
     const path = new URL(route.request().url()).pathname;
     return respond(
       route,
-      path.endsWith(first) ? job(first, 'running') : { jobs: [job(first, 'running')] },
+      path.endsWith(first)
+        ? job(first, 'running')
+        : { items: [job(first, 'running')], page: { nextCursor: null, hasMore: false } },
     );
   });
   await connect(page);
@@ -325,4 +357,99 @@ test('rendered crawl form reaches worker and exposes document provenance', async
   await page.getByText('3 documents · crawl scan', { exact: true }).click();
   await expect(page.locator('.detail details')).toContainText('/render-child');
   await page.screenshot({ path: info.outputPath('rendered-crawl.png'), fullPage: true });
+});
+
+test('recent audit pages navigate both ways and detail separates document and image progress', async ({
+  page,
+}) => {
+  const next = 'opaque-next';
+  await page.route('**/api/audits?*', async (route) => {
+    const older = new URL(route.request().url()).searchParams.has('cursor');
+    await respond(route, {
+      items: [job(older ? second : first)],
+      page: { nextCursor: older ? null : next, hasMore: !older },
+    });
+  });
+  const running = job(second, 'running');
+  running.progress = {
+    phase: 'rendering-document',
+    documentsVisited: 2,
+    documentsScheduled: 4,
+    inspected: 0,
+    total: null,
+  };
+  await page.route('**/api/audits/' + second, (route) => respond(route, running));
+  await connect(page);
+  const list = page.locator('.job-list');
+  await expect(list).toContainText(first);
+  await page.getByRole('button', { name: 'Older audits', exact: true }).click();
+  await expect(list).toContainText(second);
+  await expect(list).not.toContainText(first);
+  await expect(page.getByRole('button', { name: 'Older audits', exact: true })).toBeDisabled();
+  await list.getByRole('button').click();
+  await expect(page.locator('.progress-status')).toContainText(
+    'rendering document · 2 documents visited · 0 images inspected',
+  );
+  await page.getByRole('button', { name: 'Newer audits', exact: true }).click();
+  await expect(list).toContainText(first);
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+});
+
+test('inventory uses database pages and resets the cursor when the filter changes', async ({
+  page,
+}) => {
+  const makeRow = (i: number) => ({
+    key: 'o' + i,
+    occurrence: { id: 'o' + i, alt: { state: 'missing' }, candidates: [] },
+    candidate: { rawUrl: '/image-' + i, element: 'img', attribute: 'src', role: 'fallback' },
+    issues: [],
+  });
+  const cursor = 'opaque-images';
+  const queries: Array<URL> = [];
+  await page.route('**/api/audits**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/images')) {
+      queries.push(url);
+      const supplied = url.searchParams.get('cursor');
+      if (url.searchParams.get('filter') === 'missing_alt') {
+        expect(supplied).toBeNull();
+        return respond(route, {
+          attempt: 1,
+          items: [makeRow(24)],
+          total: 1,
+          page: { nextCursor: null, hasMore: false },
+        });
+      }
+      const older = supplied === cursor;
+      return respond(route, {
+        attempt: 1,
+        items: Array.from({ length: older ? 5 : 20 }, (_, i) => makeRow((older ? 20 : 0) + i)),
+        total: 25,
+        page: { nextCursor: older ? null : cursor, hasMore: !older },
+      });
+    }
+    if (['/documents', '/issues'].some((p) => url.pathname.endsWith(p)))
+      return respond(route, { attempt: 1, items: [], page: { nextCursor: null, hasMore: false } });
+    if (url.pathname.endsWith('/' + first)) {
+      const value = job(first);
+      value.publishedResult!.summary = {
+        ...value.publishedResult!.summary,
+        htmlOccurrences: 25,
+        candidates: 25,
+        missingAlt: 1,
+      };
+      return respond(route, value);
+    }
+    return respond(route, { items: [job(first)], page: { nextCursor: null, hasMore: false } });
+  });
+  await connect(page);
+  await page.locator('.job-list button').click();
+  await expect(page.locator('tbody tr')).toHaveCount(20);
+  await page.getByRole('button', { name: 'Next images', exact: true }).click();
+  await expect(page.locator('tbody tr')).toHaveCount(5);
+  await expect(page.locator('tbody')).toContainText('o24');
+  await page.getByLabel('Filter inventory').selectOption('missing');
+  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Previous images', exact: true })).toBeDisabled();
+  expect(queries.length).toBeGreaterThanOrEqual(3);
 });

@@ -283,7 +283,7 @@ test('API validates inputs, replays idempotency keys, and returns consistent err
     });
   const first = await create('https://example.com/');
   assert.equal(first.statusCode, 202);
-  const body = first.json<{ id: string; statusUrl: string; resultsUrl: string }>();
+  const body = first.json<{ id: string; statusUrl: string; imagesUrl: string }>();
   assert.equal(first.headers.location, body.statusUrl);
   assert.equal((await create('https://example.com/')).json<{ id: string }>().id, body.id);
   const conflict = await create('https://example.com/other');
@@ -292,8 +292,8 @@ test('API validates inputs, replays idempotency keys, and returns consistent err
   const status = await inject(body.statusUrl);
   assert.equal(status.json<{ state: string }>().state, 'queued');
   assert.ok(!status.body.includes('lease_token'));
-  assert.equal((await inject(body.resultsUrl)).json<{ available: boolean }>().available, false);
-  assert.equal((await inject('/api/audits?limit=1')).json<{ jobs: unknown[] }>().jobs.length, 1);
+  assert.equal((await inject(body.imagesUrl)).json<{ available: boolean }>().available, false);
+  assert.equal((await inject('/api/audits?limit=1')).json<{ items: unknown[] }>().items.length, 1);
   for (const response of [
     await create('https://not-approved.example/'),
     await create('https://user:password@example.com/'),
@@ -317,7 +317,7 @@ test('API validates inputs, replays idempotency keys, and returns consistent err
     assert.equal(typeof response.json<{ error: { code: string } }>().error.code, 'string');
   }
   assert.equal((await inject('/api/audits/' + randomUUID())).statusCode, 404);
-  assert.equal((await inject('/api/audits/' + randomUUID() + '/results')).statusCode, 404);
+  assert.equal((await inject('/api/audits/' + randomUUID() + '/resources')).statusCode, 404);
 });
 
 test('real engine and worker publish partial-image audits as completed and page failures as failed', async (t) => {
@@ -354,13 +354,13 @@ test('real engine and worker publish partial-image audits as completed and page 
     auditOptions: { approvedHosts: [new URL(origin).host], maxRetries: 0 },
   });
   await worker.runOnce();
-  const result = (await inject('/api/audits/' + id + '/results')).json<{
+  const result = (await inject('/api/audits/' + id + '/resources')).json<{
     state: string;
-    result: AuditResult;
+    items: AuditResult['resources'];
   }>();
   assert.equal(result.state, 'completed');
-  assert.equal(result.result.resources[0]!.state, 'failed');
-  assert.equal(result.result.resources[1]!.state, 'ok');
+  assert.equal(result.items[0]!.state, 'failed');
+  assert.equal(result.items[1]!.state, 'ok');
   assert.equal(store.get(id, 'fixture-user')!.progress.inspected, 2);
   const failedId = store.create(origin + '/missing-page', undefined, 'fixture-user').job.id;
   await worker.runOnce();
@@ -415,3 +415,30 @@ test(
     }
   },
 );
+
+test('worker publishes document progress before image inspection with independent counts', async (t) => {
+  const store = (await database(t)).open();
+  const job = store.create('https://example.com/', undefined, 'alice').job;
+  const worker = new AuditWorker(store, {
+    auditOptions: { approvedHosts: [] },
+    audit: async (_url, _options, hooks) => {
+      hooks?.onDocumentProgress?.({
+        phase: 'rendering-document',
+        documentsVisited: 1,
+        documentsScheduled: 3,
+      });
+      const progress = store.get(job.id, 'alice')!.progress;
+      assert.equal(progress.phase, 'rendering-document');
+      assert.equal(progress.documentsVisited, 1);
+      assert.equal(progress.inspected, 0);
+      hooks?.onProgress?.({ inspected: 2, total: 4 });
+      const images = store.get(job.id, 'alice')!.progress;
+      assert.equal(images.phase, 'inspecting-images');
+      assert.equal(images.documentsVisited, 1);
+      assert.equal(images.inspected, 2);
+      return successful();
+    },
+  });
+  await worker.runOnce();
+  assert.equal(store.get(job.id, 'alice')!.state, 'completed');
+});

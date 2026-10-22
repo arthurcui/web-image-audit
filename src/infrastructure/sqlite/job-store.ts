@@ -1,3 +1,11 @@
+/**
+ * One SQLite implementation backs owner-scoped audit reads, token storage and the privileged queue.
+ * Inject the narrow interface appropriate to each caller. Lease checks and state/result writes
+ * share short transactions; network inspection runs outside this module.
+ */
+import { resultQuerySchema } from '../../shared/result-query.js';
+import { prepareResult, publishResult, readResultPage } from './results.js';
+import type { ResultQuery } from '../../shared/result-query.js';
 import type { TokenRepository } from '../../application/auth.js';
 import { workerStaleAfterMs } from '../../application/readiness.js';
 import type { ReadinessStore } from '../../application/readiness.js';
@@ -11,21 +19,6 @@ import { JobError } from '../../application/jobs.js';
 import type { Claim, JobCursor, AuditRepository, WorkerQueue } from '../../application/jobs.js';
 import type { Attempt, Failure, Progress } from '../../shared/jobs.js';
 import type { AuditResult } from '../../shared/audit.js';
-
-function decodeAuditResult(json: string): AuditResult {
-  const stored = JSON.parse(json) as AuditResult & { coverage: { reasons?: string[] } };
-  if (Array.isArray(stored.coverage.findings)) return stored;
-  return {
-    ...stored,
-    coverage: {
-      complete: stored.coverage.complete,
-      findings: (stored.coverage.reasons ?? []).map((message) => ({
-        code: 'legacy-notice',
-        message,
-      })),
-    },
-  };
-}
 
 interface Row {
   scan_json: string;
@@ -41,7 +34,6 @@ interface Row {
   lease_until: number | null;
   progress_json: string;
   last_error_json: string | null;
-  result_json: string | null;
 }
 const queued: Progress = { phase: 'queued', inspected: 0, total: null };
 function job(row: Row): AuditJob {
@@ -57,7 +49,11 @@ function job(row: Row): AuditJob {
     updatedAt: row.updated_at,
     availableAt: row.available_at,
     leaseUntil: row.lease_until,
-    progress: JSON.parse(row.progress_json) as Progress,
+    progress: {
+      documentsVisited: 0,
+      documentsScheduled: 0,
+      ...(JSON.parse(row.progress_json) as Progress),
+    },
     lastError: row.last_error_json ? (JSON.parse(row.last_error_json) as Failure) : null,
   };
 }
@@ -81,7 +77,7 @@ export class SqliteJobStore
     // This is an access probe, not a disk-integrity or durability guarantee.
     return this.db
       .transaction(() => {
-        this.db.prepare('SELECT id FROM jobs LIMIT 1').get();
+        this.db.prepare('SELECT id FROM audits LIMIT 1').get();
         this.db.prepare('UPDATE worker_heartbeats SET heartbeat_at=heartbeat_at WHERE 0').run();
         const now = this.now();
         const row = this.db
@@ -128,31 +124,46 @@ export class SqliteJobStore
   }
   private row(id: string, ownerId: string) {
     this.requireOwner(ownerId);
-    return this.db.prepare('SELECT * FROM jobs WHERE id=? AND owner_id=?').get(id, ownerId) as
-      Row | undefined;
+    return this.db
+      .prepare(
+        'SELECT id,owner_id,url,state,attempts,max_attempts,created_at,updated_at,available_at,lease_until,progress_json,last_error_json,scan_json FROM audits WHERE id=? AND owner_id=?',
+      )
+      .get(id, ownerId) as Row | undefined;
   }
   get(id: string, ownerId: string) {
     const row = this.row(id, ownerId);
     return row ? job(row) : undefined;
   }
+  status(id: string, ownerId: string) {
+    return this.db.transaction(() => {
+      const current = this.get(id, ownerId);
+      if (!current) return undefined;
+      const page = this.resultPage(id, ownerId, resultQuerySchema.parse({ section: 'summary' }))!;
+      return { job: current, header: page.header };
+    })();
+  }
   list(limit: number, ownerId: string, before?: JobCursor) {
     this.requireOwner(ownerId);
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+    if (!Number.isInteger(limit) || limit < 1 || limit > 101)
       throw new RangeError('limit must be 1..100');
     if (before) {
       return (
         this.db
           .prepare(
-            'SELECT * FROM jobs WHERE owner_id=? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC,id DESC LIMIT ?',
+            'SELECT * FROM audits WHERE owner_id=? AND (created_at,id) < (?,?) ORDER BY created_at DESC,id DESC LIMIT ?',
           )
-          .all(ownerId, before.createdAt, before.createdAt, before.id, limit) as Row[]
+          .all(ownerId, before.createdAt, before.id, limit) as Row[]
       ).map(job);
     }
     return (
       this.db
-        .prepare('SELECT * FROM jobs WHERE owner_id=? ORDER BY created_at DESC,id DESC LIMIT ?')
+        .prepare('SELECT * FROM audits WHERE owner_id=? ORDER BY created_at DESC,id DESC LIMIT ?')
         .all(ownerId, limit) as Row[]
     ).map(job);
+  }
+  resultPage(id: string, ownerId: string, query: ResultQuery) {
+    this.requireOwner(ownerId);
+    return readResultPage(this.db, id, ownerId, resultQuerySchema.parse(query));
   }
   results(id: string, ownerId: string) {
     // One read transaction supplies a consistent status/result/history snapshot.
@@ -162,7 +173,7 @@ export class SqliteJobStore
       const attempts = (
         this.db
           .prepare(
-            'SELECT attempt, started_at, ended_at, outcome, failure_json FROM job_attempts WHERE job_id = ? ORDER BY attempt',
+            'SELECT attempt, started_at, ended_at, outcome, failure_json FROM audit_attempts WHERE job_id = ? ORDER BY attempt',
           )
           .all(id) as Array<{
           attempt: number;
@@ -180,10 +191,69 @@ export class SqliteJobStore
       }));
       return {
         job: job(row),
-        result: row.result_json ? decodeAuditResult(row.result_json) : null,
+        result: this.fullResult(id, ownerId),
         attempts,
       };
     })();
+  }
+  private fullResult(id: string, ownerId: string): AuditResult | null {
+    const first = this.resultPage(id, ownerId, {
+      section: 'summary',
+      filter: 'all',
+      limit: 100,
+    });
+    if (!first?.header) return null;
+    const result: AuditResult = {
+      ...first.header.metadata,
+      resources: [],
+      occurrences: [],
+      issues: [],
+      documents: [],
+      coverage: { complete: first.header.metadata.coverage.complete, findings: [] },
+    };
+    for (const section of [
+      'resources',
+      'occurrences',
+      'issues',
+      'documents',
+      'coverage',
+    ] as const) {
+      let cursor: ResultQuery['cursor'];
+      const rows: unknown[] = [];
+      do {
+        const page = this.resultPage(id, ownerId, {
+          section,
+          filter: 'all',
+          limit: 100,
+          ...(cursor ? { cursor } : {}),
+        })!;
+        rows.push(
+          ...page.items
+            .map((i) => i.value)
+            .filter(
+              (value) => section !== 'issues' || (value as { scope: string }).scope === 'image',
+            )
+            .map((value) => {
+              if (section !== 'issues') return value;
+              const { scope: _scope, ...issue } = value as { scope: string };
+              return issue;
+            }),
+        );
+        cursor = page.hasMore
+          ? {
+              jobId: id,
+              attempt: first.header.attempt,
+              section,
+              filter: 'all',
+              after: page.items.at(-1)!.ordinal,
+            }
+          : undefined;
+      } while (cursor);
+      if (section === 'coverage')
+        result.coverage.findings = rows as AuditResult['coverage']['findings'];
+      else Object.assign(result, { [section]: rows });
+    }
+    return result;
   }
   create(url: string, key: string | undefined, ownerId: string, scan: ScanOptions = defaultScan) {
     this.requireOwner(ownerId);
@@ -193,7 +263,7 @@ export class SqliteJobStore
       .transaction(() => {
         if (key !== undefined) {
           const existing = this.db
-            .prepare('SELECT * FROM jobs WHERE idempotency_key = ? AND owner_id = ?')
+            .prepare('SELECT * FROM audits WHERE idempotency_key = ? AND owner_id = ?')
             .get(scopedKey!, ownerId) as Row | undefined;
           if (existing) {
             if (existing.url !== url || existing.scan_json !== encodedScan)
@@ -208,7 +278,7 @@ export class SqliteJobStore
         const now = this.now();
         this.db
           .prepare(
-            `INSERT INTO jobs
+            `INSERT INTO audits
         (id,url,idempotency_key,state,max_attempts,created_at,updated_at,available_at,progress_json,owner_id,scan_json)
         VALUES (?,?,?,'queued',3,?,?,?,?,?,?)`,
           )
@@ -230,7 +300,7 @@ export class SqliteJobStore
   private owns(claim: Claim, now: number): boolean {
     return !!this.db
       .prepare(
-        `SELECT 1 FROM jobs WHERE id = ? AND state = 'running'
+        `SELECT 1 FROM audits WHERE id = ? AND state = 'running'
       AND lease_token = ? AND lease_until > ?`,
       )
       .get(claim.job.id, claim.token, now);
@@ -243,7 +313,7 @@ export class SqliteJobStore
         // Bounded recovery work per poll keeps the write transaction short.
         const expired = this.db
           .prepare(
-            `SELECT * FROM jobs WHERE state='running' AND lease_until <= ?
+            `SELECT * FROM audits WHERE state='running' AND lease_until <= ?
         ORDER BY lease_until LIMIT 100`,
           )
           .all(now) as Row[];
@@ -257,14 +327,14 @@ export class SqliteJobStore
           const exhausted = row.attempts >= row.max_attempts;
           this.db
             .prepare(
-              `UPDATE job_attempts SET ended_at=?,outcome='lease_expired',failure_json=?
+              `UPDATE audit_attempts SET ended_at=?,outcome='lease_expired',failure_json=?
           WHERE job_id=? AND attempt=?`,
             )
             .run(now, JSON.stringify(failure), row.id, row.attempts);
           this.db
             .prepare(
-              `UPDATE jobs SET state=?,lease_token=NULL,lease_until=NULL,updated_at=?,available_at=?,
-          last_error_json=?,result_json=NULL,progress_json=? WHERE id=?`,
+              `UPDATE audits SET state=?,lease_token=NULL,lease_until=NULL,updated_at=?,available_at=?,
+          last_error_json=?,progress_json=? WHERE id=?`,
             )
             .run(
               exhausted ? 'failed' : 'queued',
@@ -277,16 +347,17 @@ export class SqliteJobStore
         }
         const row = this.db
           .prepare(
-            `SELECT * FROM jobs WHERE state='queued' AND available_at <= ?
+            `SELECT * FROM audits WHERE state='queued' AND available_at <= ?
         AND attempts < max_attempts ORDER BY available_at,created_at,id LIMIT 1`,
           )
           .get(now) as Row | undefined;
         if (!row) return undefined;
+        this.db.prepare('DELETE FROM audit_results WHERE job_id=?').run(row.id);
         const token = randomUUID();
         this.db
           .prepare(
-            `UPDATE jobs SET state='running',attempts=attempts+1,lease_token=?,lease_until=?,
-        updated_at=?,progress_json=?,result_json=NULL WHERE id=?`,
+            `UPDATE audits SET state='running',attempts=attempts+1,lease_token=?,lease_until=?,
+        updated_at=?,progress_json=? WHERE id=?`,
           )
           .run(
             token,
@@ -296,7 +367,7 @@ export class SqliteJobStore
             row.id,
           );
         this.db
-          .prepare('INSERT INTO job_attempts(job_id,attempt,started_at) VALUES (?,?,?)')
+          .prepare('INSERT INTO audit_attempts(job_id,attempt,started_at) VALUES (?,?,?)')
           .run(row.id, row.attempts + 1, now);
         return { job: this.get(row.id, row.owner_id)!, token };
       })
@@ -314,7 +385,7 @@ export class SqliteJobStore
         return (
           this.db
             .prepare(
-              `UPDATE jobs SET lease_until=?,updated_at=?
+              `UPDATE audits SET lease_until=?,updated_at=?
         WHERE id=? AND state='running' AND lease_token=? AND lease_until > ?`,
             )
             .run(now + leaseMs, now, claim.job.id, claim.token, now).changes === 1
@@ -330,7 +401,7 @@ export class SqliteJobStore
         return (
           this.db
             .prepare(
-              `UPDATE jobs SET progress_json=?,updated_at=?
+              `UPDATE audits SET progress_json=?,updated_at=?
         WHERE id=? AND state='running' AND lease_token=? AND lease_until > ?`,
             )
             .run(encoded, now, claim.job.id, claim.token, now).changes === 1
@@ -339,20 +410,22 @@ export class SqliteJobStore
       .immediate();
   }
   complete(claim: Claim, result: AuditResult) {
-    const encoded = JSON.stringify(result); // Serialize before acquiring the write lock.
+    const prepared = prepareResult(result, claim.job.attempts); // Prepare rows before the write lock.
     return this.db
       .transaction(() => {
         const now = this.now();
         if (!this.owns(claim, now)) return false;
+        publishResult(this.db, claim.job.id, claim.job.attempts, prepared);
         this.db
           .prepare(
-            `UPDATE jobs SET state='completed',result_json=?,progress_json=?,updated_at=?,
+            `UPDATE audits SET state='completed',progress_json=?,updated_at=?,
         lease_token=NULL,lease_until=NULL WHERE id=?`,
           )
           .run(
-            encoded,
             JSON.stringify({
               phase: 'completed',
+              documentsVisited: result.documents?.length ?? 1,
+              documentsScheduled: result.documents?.length ?? 1,
               inspected: result.resources.length,
               total: result.resources.length,
             }),
@@ -361,7 +434,7 @@ export class SqliteJobStore
           );
         this.db
           .prepare(
-            `UPDATE job_attempts SET ended_at=?,outcome='completed' WHERE job_id=? AND attempt=?`,
+            `UPDATE audit_attempts SET ended_at=?,outcome='completed' WHERE job_id=? AND attempt=?`,
           )
           .run(now, claim.job.id, claim.job.attempts);
         return true;
@@ -372,30 +445,41 @@ export class SqliteJobStore
     if (!Number.isSafeInteger(retryDelayMs) || retryDelayMs < 0 || retryDelayMs > 86_400_000) {
       throw new RangeError('Retry delay must be between 0 and one day');
     }
-    const encoded = result ? JSON.stringify(result) : null;
+    const prepared = result ? prepareResult(result, claim.job.attempts) : null;
     return this.db
       .transaction(() => {
         const now = this.now();
         if (!this.owns(claim, now)) return false;
         const retry = failure.retryable && claim.job.attempts < claim.job.maxAttempts;
+        this.db.prepare('DELETE FROM audit_results WHERE job_id=?').run(claim.job.id);
+        if (!retry && prepared) publishResult(this.db, claim.job.id, claim.job.attempts, prepared);
         const error = JSON.stringify({ ...failure, at: now });
         this.db
           .prepare(
-            `UPDATE jobs SET state=?,updated_at=?,available_at=?,last_error_json=?,
-        result_json=?,progress_json=?,lease_token=NULL,lease_until=NULL WHERE id=?`,
+            `UPDATE audits SET state=?,updated_at=?,available_at=?,last_error_json=?,
+        progress_json=?,lease_token=NULL,lease_until=NULL WHERE id=?`,
           )
           .run(
             retry ? 'queued' : 'failed',
             now,
             now + retryDelayMs,
             error,
-            retry ? null : encoded,
-            JSON.stringify(retry ? queued : { phase: 'failed', inspected: 0, total: null }),
+            JSON.stringify(
+              retry
+                ? queued
+                : {
+                    phase: 'failed',
+                    inspected: result?.resources.length ?? 0,
+                    total: null,
+                    documentsVisited: result?.documents?.length ?? 0,
+                    documentsScheduled: result?.documents?.length ?? 0,
+                  },
+            ),
             claim.job.id,
           );
         this.db
           .prepare(
-            `UPDATE job_attempts SET ended_at=?,outcome=?,failure_json=? WHERE job_id=? AND attempt=?`,
+            `UPDATE audit_attempts SET ended_at=?,outcome=?,failure_json=? WHERE job_id=? AND attempt=?`,
           )
           .run(now, retry ? 'retry' : 'failed', error, claim.job.id, claim.job.attempts);
         return true;

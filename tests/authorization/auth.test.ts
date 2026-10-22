@@ -108,7 +108,7 @@ test('HTTP endpoints reveal neither foreign jobs nor their results or attempt hi
   t.after(() => app.close());
   const aJob = service.create(a, { url: 'https://example.com/a' }).job;
   const bJob = service.create(b, { url: 'https://example.com/b' }).job;
-  for (const suffix of ['', '/results']) {
+  for (const suffix of ['', '/images', '/resources', '/documents', '/issues']) {
     const hidden = await app.inject({
       url: '/api/audits/' + bJob.id + suffix,
       headers: { authorization: a },
@@ -128,7 +128,7 @@ test('HTTP endpoints reveal neither foreign jobs nor their results or attempt hi
   }
   const list = await app.inject({ url: '/api/audits', headers: { authorization: a } });
   assert.deepEqual(
-    list.json<{ jobs: Array<{ id: string }> }>().jobs.map((j) => j.id),
+    list.json<{ items: Array<{ id: string }> }>().items.map((j) => j.id),
     [aJob.id],
   );
   const created = await app.inject({
@@ -143,7 +143,7 @@ test('HTTP endpoints reveal neither foreign jobs nor their results or attempt hi
     for (const url of [
       '/api/audits',
       '/api/audits/' + aJob.id,
-      '/api/audits/' + aJob.id + '/results',
+      '/api/audits/' + aJob.id + '/images',
     ]) {
       const response = await app.inject({ url, headers: authorization ? { authorization } : {} });
       assert.equal(response.statusCode, 401);

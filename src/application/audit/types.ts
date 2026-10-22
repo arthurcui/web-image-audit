@@ -33,3 +33,9 @@ export const defaultAuditLimits = {
 } as const;
 
 export type Limits = { [K in keyof typeof defaultAuditLimits]: number };
+
+export interface DocumentProgress {
+  phase: 'fetching-document' | 'rendering-document' | 'discovering-documents';
+  documentsVisited: number;
+  documentsScheduled: number;
+}

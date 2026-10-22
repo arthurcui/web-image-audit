@@ -78,10 +78,27 @@ async function fixture(t: TestContext) {
 
 test('rendered crawl discovers delayed JS/data images, iframe/srcdoc images, provenance and globally shared resources', async (t) => {
   const f = await fixture(t);
-  const result = await runAudit(f.url + '/redirect', {
-    ...f.options,
-    scan: { ...defaultScan, mode: 'crawl', includeIframes: true, maxPages: 2, maxDepth: 1 },
-  });
+  const phases: string[] = [];
+  let visited = 0;
+  const result = await runAudit(
+    f.url + '/redirect',
+    {
+      ...f.options,
+      scan: { ...defaultScan, mode: 'crawl', includeIframes: true, maxPages: 2, maxDepth: 1 },
+    },
+    {
+      onDocumentProgress: (p) => {
+        phases.push(p.phase);
+        assert.ok(p.documentsVisited >= visited);
+        visited = p.documentsVisited;
+      },
+      onProgress: () => {
+        assert.ok(visited > 0);
+      },
+    },
+  );
+  assert.ok(phases.includes('rendering-document'));
+  assert.equal(visited, result.documents?.length);
   assert.equal(result.page.state, 'ok');
   assert.ok(result.resources.some((r) => r.requestedUrl.endsWith('/dynamic.png')));
   assert.ok(result.resources.some((r) => r.requestedUrl.endsWith('/data.png')));

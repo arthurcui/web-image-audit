@@ -62,3 +62,31 @@ Historical failed jobs remain failed; submit a new audit after fixing configurat
 For fixture demos, stop normal API/frontend processes before npm run demo, and
 provision with demo:token. A normal-mode token belongs to a different database.
 Restart API, worker and MCP and reload the UI after updates that change contracts.
+
+## Result storage upgrade (migration 6)
+
+Stop API, worker and MCP processes before upgrading. With connections closed, back
+up SQLite, run `npm run db:migrate`, then restart all processes. Do not run older
+binaries against this schema. The upgrade preserves legacy JSON and version-5
+published rows, renames jobs/job_attempts to audits/audit_attempts, separates image
+resources/occurrences/candidates, and removes result_json and duplicate inventory
+snapshots. Coverage and image findings share audit_issues with an explicit scope.
+Schema and backfill commit atomically; failures roll back. Large histories require
+temporary disk space and can make this one-time write transaction slow.
+
+Publication prepares rows outside its transaction, then checks the worker lease
+under the write lock and atomically publishes rows, summary and terminal state.
+Expired workers cannot overwrite results. No transaction spans network I/O or
+export yields. Do not manually modify published rows.
+
+Result cursors refer to immutable published attempts. HTTP 409 stale_cursor means
+restart pagination. If a result changes during a streamed export, restart the
+failed download. Raw pages target 128 KiB of item data, allowing one oversized row
+for lossless output; engine input limits bound source size. MCP additionally clips
+text and limits item JSON to 20,000 bytes. Only exports reconstruct the full public
+audit; interactive endpoints use bounded pages and cached summary metadata.
+
+Run `npm run benchmark:results` for local synthetic measurements (no network,
+tokens or persistent database). Sampled heap growth reflects allocation/GC and is
+not a peak-RSS guarantee. Joined image pages may sort bounded candidate sets;
+resource pages and recent-audit keysets use indexed ordering.

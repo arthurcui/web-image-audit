@@ -3,7 +3,7 @@ import { collectDocuments } from './documents.js';
 import { createFetcher } from './adapters/http-fetcher.js';
 import { createUrlPolicy } from './policy.js';
 import { defaultAuditLimits } from './types.js';
-import type { AuditOptions, Limits } from './types.js';
+import type { AuditOptions, Limits, DocumentProgress } from './types.js';
 import type { AuditResult, Resource } from '../../shared/audit.js';
 export type { AuditOptions } from './types.js';
 export type {
@@ -38,12 +38,20 @@ function getLimits(options: AuditOptions): Limits {
 export async function runAudit(
   pageUrl: string,
   options: AuditOptions,
-  hooks: { onProgress?: (progress: { inspected: number; total: number }) => void } = {},
+  hooks: {
+    onDocumentProgress?: (progress: DocumentProgress) => void;
+    onProgress?: (progress: { inspected: number; total: number }) => void;
+  } = {},
 ): Promise<AuditResult> {
   const limits = getLimits(options);
   const policy = createUrlPolicy(options.approvedHosts);
   const fetchResource = createFetcher(policy, limits);
-  const { result, findings } = await collectDocuments(pageUrl, options, limits);
+  const { result, findings } = await collectDocuments(
+    pageUrl,
+    options,
+    limits,
+    hooks.onDocumentProgress,
+  );
   const occurrences = result.occurrences;
   const resources = new Map<string, Resource>();
   for (const occurrence of occurrences) {

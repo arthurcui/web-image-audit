@@ -11,7 +11,7 @@ test('scripted commands require explicit supported actions and never interpret w
   });
   assert.deepEqual(parseDemoCommand('issues ' + id, null, 'key'), {
     name: 'get_audit_results',
-    arguments: { id, section: 'issues', limit: 5, offset: 0 },
+    arguments: { id, section: 'issues', limit: 5 },
   });
   assert.equal(parseDemoCommand('List my audits', null, 'key').name, 'list_audits');
   for (const command of [

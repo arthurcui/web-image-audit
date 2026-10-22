@@ -35,7 +35,7 @@ operational guidance in [operations](OPERATIONS.md), and trade-offs in
 - [x] Separate AuditRepository, privileged WorkerQueue and TokenRepository
   interfaces sharing one SQLite implementation; public reads require an owner.
 - [x] Explicit audit/fetch names and structured coverage code/message findings;
-  stored legacy coverage is normalized on read.
+  stored legacy coverage is normalized during migration 6.
 - [x] App composition separated from connection, submission, recent-list and
   detail components; HTTP/Playwright adapters grouped within the audit module.
 - [x] CLI entry points under src/cli; SQLite connection, repository and migrations
@@ -48,10 +48,22 @@ operational guidance in [operations](OPERATIONS.md), and trade-offs in
 - [x] Shared summary counts, correctness linting and consistent formatting in CI.
 - [x] Regression coverage for malformed inputs and private-field exclusion.
 
+- [x] Separate document discovery/rendering progress from image inspection counts.
+- [x] Owner-scoped REST cursors and Older/Newer navigation for recent audits.
+- [x] Bounded REST result endpoints and shared storage services with MCP; full streaming exports.
+
+- [x] Migration 6 replaces initial result rows with normalized image tables and cached summaries.
+- [x] Indexed cursor pages, SQL inventory filters, limit-plus-one recent lists,
+  and attempt-bound cursor rejection preserve ownership and stale-worker fencing.
+- [x] UI loads summary/pages; JSON/CSV exports stream database batches.
+- [x] Added query-plan, migration, cursor, publication rollback and export tests;
+  reproducible synthetic benchmark records latency, bytes and sampled heap growth.
+
 ## Verification
 
-Latest local verification: 64 Node tests, 9 Chromium UI tests, lint, formatting,
-dependency boundaries, strict type checks and production build passed.
+Latest local verification: 74 Node tests, lint, formatting,
+dependency boundaries, strict type checks and production build passed. The most recent
+Chromium UI run passed 11 tests; documentation-only changes did not rerun those workflows.
 
 Run `npm run check:all` for dependency boundaries, Node tests, strict type checks,
 production builds and Chromium UI workflows. Tests use local fixtures and temporary
@@ -59,3 +71,17 @@ SQLite databases. See README for focused test commands.
 
 Remote CI status and branch-protection configuration must be checked on GitHub;
 this checklist does not assert that a remote workflow or required check passed.
+
+
+## API and persistence redesign
+
+- [x] Explicit REST image/resource/document/issue endpoints and cached status summary.
+- [x] Opaque cursor contract and common page envelope for REST/MCP.
+- [x] Normalize resources, occurrences, candidates, documents and scoped findings.
+- [x] Transactional migration preserving existing audit history and lease-fenced publication.
+- [x] UI/demo consumers, streaming exports, migration/cursor regression tests and updated ERD.
+
+- [x] Disabled navigation buttons use the normal cursor instead of a busy indicator.
+- [x] Documentation cross-check covers current routes, forward-only cursors, migration 6 and ERD constraints.
+
+- [x] Current REST endpoint contracts documented in OpenAPI and API usage guide.
