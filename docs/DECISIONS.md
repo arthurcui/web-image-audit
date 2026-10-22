@@ -10,67 +10,136 @@ managed backups and availability, but adds credentials, service cost and operati
 
 ## Database schema
 
-The schema after migration 4 contains four application tables and one migration
-tracking table. Source: [migrations.ts](../src/infrastructure/sqlite/migrations.ts).
+Migration 6 implements normalized result storage. Sources:
+[migrations.ts](../src/infrastructure/sqlite/migrations.ts) and
+[results.ts](../src/infrastructure/sqlite/results.ts).
 
 ```mermaid
 erDiagram
-    JOBS ||--o{ JOB_ATTEMPTS : "has attempts"
-
-    JOBS {
+    AUDITS ||--o{ AUDIT_ATTEMPTS : attempts
+    AUDITS ||--o{ AUDIT_RESULTS : publishes
+    AUDIT_RESULTS ||--o{ IMAGE_RESOURCES : resources
+    AUDIT_RESULTS ||--o{ IMAGE_OCCURRENCES : occurrences
+    IMAGE_OCCURRENCES ||--o{ IMAGE_CANDIDATES : candidates
+    IMAGE_RESOURCES o|--o{ IMAGE_CANDIDATES : references
+    AUDIT_RESULTS ||--o{ AUDIT_DOCUMENTS : documents
+    AUDIT_RESULTS ||--o{ AUDIT_ISSUES : findings
+    AUDITS {
         TEXT id PK
-        TEXT owner_id "Logical user identity"
+        TEXT owner_id
         TEXT url
-        TEXT idempotency_key UK "Nullable; encoded owner and key"
-        TEXT state "queued, running, completed, failed"
+        TEXT idempotency_key UK
+        TEXT state
         INTEGER attempts
         INTEGER max_attempts
         INTEGER created_at
         INTEGER updated_at
         INTEGER available_at
-        TEXT lease_token "Nullable"
-        INTEGER lease_until "Nullable"
+        TEXT lease_token
+        INTEGER lease_until
         TEXT scan_json
         TEXT progress_json
-        TEXT last_error_json "Nullable"
-        TEXT result_json "Nullable"
+        TEXT last_error_json
     }
-
-    JOB_ATTEMPTS {
-        TEXT job_id PK, FK
+    AUDIT_ATTEMPTS {
+        TEXT job_id PK,FK
         INTEGER attempt PK
         INTEGER started_at
-        INTEGER ended_at "Nullable"
-        TEXT outcome "Nullable"
-        TEXT failure_json "Nullable"
+        INTEGER ended_at
+        TEXT outcome
+        TEXT failure_json
     }
-
+    AUDIT_RESULTS {
+        TEXT job_id PK,FK
+        INTEGER attempt PK
+        TEXT header_json
+    }
+    IMAGE_RESOURCES {
+        TEXT job_id PK,FK
+        INTEGER attempt PK,FK
+        INTEGER ordinal PK
+        TEXT id
+        TEXT state
+        INTEGER bytes
+        INTEGER oversized
+        TEXT metadata_json
+    }
+    IMAGE_OCCURRENCES {
+        TEXT job_id PK,FK
+        INTEGER attempt PK,FK
+        INTEGER ordinal PK
+        INTEGER image_ordinal
+        TEXT id
+        TEXT document_id
+        TEXT alt_state
+        TEXT alt_text
+        TEXT metadata_json
+    }
+    IMAGE_CANDIDATES {
+        TEXT job_id PK,FK
+        INTEGER attempt PK,FK
+        INTEGER ordinal PK
+        INTEGER occurrence_ordinal FK
+        TEXT resource_id FK
+        TEXT attribute
+        TEXT role
+        TEXT metadata_json
+    }
+    AUDIT_DOCUMENTS {
+        TEXT job_id PK,FK
+        INTEGER attempt PK,FK
+        INTEGER ordinal PK
+        TEXT id
+        TEXT parent_url
+        TEXT kind
+        TEXT url
+        TEXT state
+        INTEGER depth
+    }
+    AUDIT_ISSUES {
+        TEXT job_id PK,FK
+        INTEGER attempt PK,FK
+        INTEGER ordinal PK
+        TEXT scope
+        TEXT code
+        TEXT message
+        TEXT occurrence_id
+        TEXT resource_id
+    }
     BEARER_TOKENS {
-        TEXT token_hash PK "SHA-256; plaintext never stored"
-        TEXT user_id "Logical user identity"
+        TEXT token_hash PK
+        TEXT user_id
         INTEGER created_at
     }
-
     WORKER_HEARTBEATS {
         TEXT worker_id PK
         INTEGER heartbeat_at
     }
-
     SCHEMA_MIGRATIONS {
         INTEGER version PK
     }
 ```
 
-- Jobs to attempts is the only foreign-key relationship. An attempt is identified
-  by the composite primary key (job_id, attempt).
-- jobs.owner_id and bearer_tokens.user_id identify the same logical user through
-  application ownership checks. There is no users or tenants table and no foreign
-  key between tokens and jobs. Multiple tokens can belong to one user.
-- Image resources, occurrences, documents and findings are nested in result_json,
-  rather than separate relational tables. scan_json stores the requested scan options.
-- Worker heartbeats report process readiness independently of per-job lease tokens.
-- schema_migrations records applied versions. Timestamps are Unix milliseconds.
-- Token records currently have no expiry or revocation fields.
+- The ERD shows database cardinality: (job_id, attempt) permits multiple result
+  headers per audit. Application publication keeps at most one by deleting the
+  previous header in the same transaction; job_id alone is not UNIQUE.
+- Children are scoped by (job_id, attempt), with cascading deletion from the
+  published result. Candidate resource and occurrence references use composite
+  foreign keys so references cannot cross audits/attempts. Resource and occurrence
+  IDs are unique within an attempt. Document IDs and issue references retain
+  diagnostic provenance; they are not all foreign-key constrained.
+- Each candidate stores only its own metadata, not a resource/occurrence snapshot.
+  Inventory is joined at read time. Occurrence alt state remains independent of
+  shared resource outcomes. Occurrences without candidates still get an image row.
+- Filter columns (resource state/oversized and occurrence alt_state) are explicit
+  and indexed. Optional fetch/browser metadata stays JSON; it is not duplicated
+  in candidate or inventory snapshots. Cached summary/counts are deliberate
+  derived data published in the same transaction as rows.
+- audits.owner_id and bearer_tokens.user_id identify the same logical user through
+  service checks. There is no users/tenants table or token-to-audit foreign key.
+  Multiple tokens may belong to a user; token expiry/revocation is not implemented.
+- Worker readiness heartbeats are independent of job leases. Timestamps are Unix
+  milliseconds; schema_migrations records applied versions.
 
 ## Database queue instead of SQS
 
@@ -126,3 +195,29 @@ timed snapshots and isolated frames are not faithful full interactive sessions.
 The project-local browser manifest makes the runtime visible to the same worker
 that consumes jobs. Browser downloads and runtime manifests are not repository data.
 Neither discovery strategy establishes visibility or accessibility compliance.
+
+## Database-backed pagination
+
+Public REST/MCP pages use versioned opaque cursors and the same page envelope.
+Positions are validated and ownership is checked on every read. Recent audits use
+an indexed (owner, created_at, id) keyset. Result cursors bind a published attempt,
+section and filter so retry publication cannot silently mix pages.
+
+Result rows use composite ordinal keys. Image pages join normalized occurrences,
+candidates and resources, with indexed issue lookups in the same statement; there
+are no application-level per-candidate queries. The joined display ordering can
+require a temporary sort over the engine-bounded candidate set. Filtered totals
+also require counting matches; we do not claim constant-time arbitrary site-scale
+queries. Separate resource/filter indexes support outcome queries. Raise engine
+limits only after profiling these joins/counts.
+
+The engine still assembles one bounded result in memory before publication. SQL
+rows/metadata are prepared outside the write transaction, then atomically published
+with the summary and terminal state under the lease fence. Migration 6 preserves
+older JSON snapshots and version-5 rows in a transaction; it holds a write lock and
+needs temporary disk space. Exports read batches and yield without holding locks.
+
+Use `npm run benchmark:results` for repeatable local diagnostics. Timing and sampled
+heap allocation are not production SLOs or peak-memory guarantees. Tests assert
+ownership, cursor stability, publication rollback, migration fidelity, and indexed
+keyset/resource lookups rather than machine-dependent timing thresholds.

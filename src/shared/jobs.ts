@@ -1,9 +1,20 @@
+import type { summarizeAudit } from './summary.js';
 import type { AuditResult } from './audit.js';
 import type { ScanOptions } from './scan.js';
 
 export type JobState = 'queued' | 'running' | 'completed' | 'failed';
 export interface Progress {
-  phase: 'queued' | 'fetching-page' | 'inspecting-images' | 'completed' | 'failed';
+  phase:
+    | 'queued'
+    | 'fetching-page'
+    | 'fetching-document'
+    | 'rendering-document'
+    | 'discovering-documents'
+    | 'inspecting-images'
+    | 'completed'
+    | 'failed';
+  documentsVisited?: number;
+  documentsScheduled?: number;
   inspected: number;
   total: number | null;
 }
@@ -35,9 +46,16 @@ export interface Attempt {
 }
 
 export interface ResultsResponse {
+  summary?: ReturnType<typeof summarizeAudit>;
+  attempt?: number;
+  coveragePreviewIncomplete?: boolean;
   id: string;
   state: JobState;
   available: boolean;
   result: AuditResult | null;
   attempts: Attempt[];
+}
+
+export interface AuditStatus extends AuditJob {
+  publishedResult: import('./result-query.js').ResultHeader | null;
 }

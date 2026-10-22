@@ -90,27 +90,26 @@ configured bearer credential to the same AuditService used by the HTTP API.
 
 | Tool | Inputs | Output |
 | --- | --- | --- |
-| start_audit | url; optional idempotencyKey | id, state, replayed immediately after enqueue |
+| start_audit | url; optional scan, idempotencyKey | id, state, replayed immediately after enqueue |
 | get_audit_status | id | job state, progress, creation time, attempt count, last error |
-| get_audit_results | id; section (default issues), offset (default 0), limit (default 10) | summary and one page; available=false until a result exists |
-| list_audits | limit (default 10), optional before | recent owned jobs and nextCursor |
+| get_audit_results | id; section (default issues), optional cursor, limit (default 10) | summary and one page; available=false until a result exists |
+| list_audits | limit (default 10), optional cursor | items and page {nextCursor, hasMore} |
 
 Success uses `{ok:true,data:...,error:null}`. Application failures set MCP
 `isError:true` and return `{ok:false,data:null,error:{code,message}}`.
 SDK input-validation failures use its standard tool-error format. Unknown and
 foreign job IDs share the same job_not_found response.
 
-Idempotency keys are scoped per user: the same key and normalized URL return
-the same job, while a different URL conflicts. Without a key, every call creates
+Idempotency keys are scoped per user: the same key and normalized URL/scan options return
+the same job, while a different payload conflicts. Without a key, every call creates
 a new job; start_audit is therefore not advertised as universally idempotent.
 
 Results sections: **summary**, **issues**, **resources**, **candidates**, and
 **coverage** (structured incomplete-coverage findings: code and message). Summary is counts only; all other
-sections also include it. Page sizes are 1–20, offsets 0–1,000,000. Follow
-nextOffset with the same job/section until null. A large page may return fewer
-items than requested to meet the byte budget. Offsets beyond the end return
-an empty page. Stored terminal results are immutable, so their offsets are
-stable. Active attempts do not expose transient partial snapshots.
+sections also include it. Issues carry scope=image or coverage. Page sizes are
+1–20. Follow `data.page.nextCursor` as `cursor` with the same id/section until null.
+Pages may contain fewer items than requested to meet the byte budget. Active
+attempts do not expose transient partial snapshots. Offsets are not accepted.
 
 Strings are clipped to 256 UTF-16 code units with an ellipsis and an explicit
 truncatedFields flag. Full values remain in the stored audit/API/frontend
@@ -119,12 +118,18 @@ including both text and structured copies, stay below 64 KiB. Responses omit
 raw HTML, image bodies and unbounded nested candidate arrays. Counts distinguish
 unique resources, occurrences, candidates, missing alt, and empty alt.
 
-List pagination uses the descending (createdAt, id) keyset; pass nextCursor as
-before. Newer insertions do not shift subsequent pages. Cursors describe positions
-and never grant access. Each query still filters by the authenticated owner.
-Job status may change between pages: this is not a database-wide snapshot.
-Result pagination bounds the wire response; the service still parses the stored
-result JSON in memory. Database-level streaming is not implemented.
+List pagination uses descending (createdAt, id); pass `data.page.nextCursor` as
+`cursor`. All page responses use `{items,page:{nextCursor,hasMore}}`. New insertions
+do not shift subsequent pages; job status can still change between calls. Tokens
+are opaque versioned encodings, not credentials; ownership is checked every time.
+
+Result pages read normalized SQLite rows and cached summaries. They include
+attempt, total and available. Tokens bind job/attempt/section/filter/ordinal;
+`stale_cursor` means restart pagination. MCP clips text independently of REST.
+Full-fidelity REST JSON/CSV exports stream batches; the HTTP contracts are in
+[API.md](API.md) and [OpenAPI](openapi.json). Pagination is forward-only;
+to revisit a previous page, save and reuse its request cursor and limit. Omit the
+cursor to return to the first page. No previousCursor is returned.
 
 ## Sample workflow
 
@@ -138,7 +143,8 @@ missing alt and one HTTP 404). IDs are illustrative, not a saved external audit.
    returns immediately. The separate worker eventually publishes completed.
 3. `get_audit_results({"id":"11111111-1111-4111-8111-111111111111","section":"issues","limit":5})`
    → summary has uniqueResources=2, htmlOccurrences=2, failedResources=1,
-   missingAlt=1, emptyAlt=1; issues report missing-alt and HTTP failure.
+   missingAlt=1, emptyAlt=1; issues report missing-alt, HTTP failure, and a
+   coverage finding for the failed resource.
 
 A concise assistant summary could be: “Inspected 2 unique resources across
 2 HTML image occurrences. One resource returned HTTP 404; one occurrence lacks

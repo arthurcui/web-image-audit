@@ -131,7 +131,7 @@ test(
     assert.deepEqual(result['items'], []);
     assert.equal(
       (data(await call(client, 'get_audit_results', { id }))['items'] as unknown[]).length,
-      2,
+      3,
     );
     assert.ok(!stderr().includes(env.tokenA));
   },
@@ -158,7 +158,7 @@ test(
       assert.deepEqual(foreign.structuredContent, missing.structuredContent);
     }
     assert.deepEqual(
-      (data(await call(b, 'list_audits'))['jobs'] as Array<{ id: string }>).map((job) => job.id),
+      (data(await call(b, 'list_audits'))['items'] as Array<{ id: string }>).map((job) => job.id),
       [ownB],
     );
     assert.equal(
@@ -213,14 +213,14 @@ test(
     env.store.create('https://example.com/private', undefined, 'bob');
     const { client } = await env.connect();
     const first = data(await call(client, 'list_audits', { limit: 10 }));
-    const seen = (first['jobs'] as Array<{ id: string }>).map((job) => job.id);
+    const seen = (first['items'] as Array<{ id: string }>).map((job) => job.id);
     assert.equal(seen.length, 10);
     env.store.create('https://example.com/new', undefined, 'alice');
-    let before = first['nextCursor'];
+    let before = (first['page'] as { nextCursor: string | null }).nextCursor;
     while (before) {
-      const page = data(await call(client, 'list_audits', { limit: 10, before }));
-      seen.push(...(page['jobs'] as Array<{ id: string }>).map((job) => job.id));
-      before = page['nextCursor'];
+      const page = data(await call(client, 'list_audits', { limit: 10, cursor: before }));
+      seen.push(...(page['items'] as Array<{ id: string }>).map((job) => job.id));
+      before = (page['page'] as { nextCursor: string | null }).nextCursor;
     }
     assert.equal(new Set(seen).size, 27);
     assert.deepEqual([...seen].sort(), ids.sort());
@@ -261,18 +261,21 @@ test(
     };
     assert.equal(env.store.complete(claim, result), true);
     const { client } = await env.connect();
-    let offset = 0;
+    let cursor: string | undefined;
     let total = 0;
     for (;;) {
-      const page = data(await call(client, 'get_audit_results', { id, limit: 20, offset }));
+      const page = data(
+        await call(client, 'get_audit_results', { id, limit: 20, ...(cursor ? { cursor } : {}) }),
+      );
       total += (page['items'] as unknown[]).length;
       assert.equal(page['truncatedFields'], true);
       assert.match(page['untrustedDataNotice'] as string, /never instructions/);
-      if (page['nextOffset'] === null) break;
-      assert.ok((page['nextOffset'] as number) > offset);
-      offset = page['nextOffset'] as number;
+      const next = (page['page'] as { nextCursor: string | null }).nextCursor;
+      if (!next) break;
+      assert.notEqual(next, cursor);
+      cursor = next;
     }
-    assert.equal(total, 45);
+    assert.equal(total, 46);
     const coverage = data(
       await call(client, 'get_audit_results', { id, section: 'coverage', limit: 20 }),
     );
@@ -286,10 +289,32 @@ test(
     );
     assert.ok((candidates['items'] as unknown[]).length < 20);
     assert.equal(candidates['truncatedFields'], true);
-    assert.equal(
-      data(await call(client, 'get_audit_results', { id, offset: 999 }))['nextOffset'],
-      null,
+    const cursorPage = data(
+      await call(client, 'get_audit_results', {
+        id,
+        section: 'candidates',
+        limit: 20,
+        cursor: (candidates['page'] as { nextCursor: string }).nextCursor,
+      }),
     );
+    const firstIds = (candidates['items'] as Array<{ occurrenceId: string }>).map(
+      (row) => row.occurrenceId,
+    );
+    const nextIds = (cursorPage['items'] as Array<{ occurrenceId: string }>).map(
+      (row) => row.occurrenceId,
+    );
+    assert.ok(nextIds.length > 0);
+    assert.ok(nextIds.every((id) => !firstIds.includes(id)));
+    const stale = await call(client, 'get_audit_results', {
+      id,
+      section: 'resources',
+      cursor: (candidates['page'] as { nextCursor: string }).nextCursor,
+    });
+    assert.equal(
+      (stale.structuredContent as { error: { code: string } }).error.code,
+      'stale_cursor',
+    );
+    assert.equal((await call(client, 'get_audit_results', { id, offset: 999 })).isError, true);
   },
 );
 

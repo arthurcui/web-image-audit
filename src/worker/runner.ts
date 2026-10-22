@@ -75,6 +75,8 @@ export class AuditWorker {
       });
     emit('audit_claimed');
     let lost = false;
+    let documentsVisited = 0;
+    let documentsScheduled = 0;
     const heartbeat = setInterval(() => {
       try {
         if (!this.queue.heartbeat(claim, this.leaseMs)) lost = true;
@@ -88,8 +90,22 @@ export class AuditWorker {
         claim.job.url,
         { ...this.options.auditOptions, ...(claim.job.scan ? { scan: claim.job.scan } : {}) },
         {
+          onDocumentProgress: (progress) => {
+            documentsVisited = progress.documentsVisited;
+            documentsScheduled = progress.documentsScheduled;
+            if (!lost && !this.queue.progress(claim, { ...progress, inspected: 0, total: null }))
+              lost = true;
+          },
           onProgress: (progress) => {
-            if (!lost && !this.queue.progress(claim, { phase: 'inspecting-images', ...progress }))
+            if (
+              !lost &&
+              !this.queue.progress(claim, {
+                phase: 'inspecting-images',
+                documentsVisited,
+                documentsScheduled,
+                ...progress,
+              })
+            )
               lost = true;
           },
         },

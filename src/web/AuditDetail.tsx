@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { AuditJob } from '../shared/jobs.js';
+import type { AuditJob, AuditStatus } from '../shared/jobs.js';
 import { isActive, requestAuditApi } from './client.js';
 import type { ResultsResponse } from './client.js';
 import { usePolling } from './usePolling.js';
@@ -23,14 +23,50 @@ export function AuditDetail({
   }, []);
   const load = useCallback(
     async (signal: AbortSignal) => {
-      const job = await requestAuditApi<AuditJob>(token, '/' + encodeURIComponent(id), signal);
-      const results = isActive(job)
-        ? null
-        : await requestAuditApi<ResultsResponse>(
-            token,
-            '/' + encodeURIComponent(id) + '/results',
-            signal,
-          );
+      const job = await requestAuditApi<AuditStatus>(token, '/' + encodeURIComponent(id), signal);
+      const header = job.publishedResult;
+      let results: ResultsResponse | null = null;
+      if (header && !isActive(job)) {
+        const [documents, issues] = await Promise.all([
+          requestAuditApi<{
+            attempt: number;
+            items: NonNullable<import('../shared/audit.js').AuditResult['documents']>;
+            page: { hasMore: boolean };
+          }>(token, '/' + id + '/documents?limit=100', signal),
+          requestAuditApi<{
+            attempt: number;
+            items: Array<{ scope: string; code: string; message: string }>;
+            page: { hasMore: boolean };
+          }>(token, '/' + id + '/issues?limit=100', signal),
+        ]);
+        if (documents.attempt !== header.attempt || issues.attempt !== header.attempt)
+          throw new Error('Results changed. Retry details.');
+        results = {
+          id,
+          state: job.state,
+          available: true,
+          attempts: [],
+          attempt: header.attempt,
+          summary: header.summary,
+          coveragePreviewIncomplete: issues.page.hasMore || documents.page.hasMore,
+          result: {
+            ...header.metadata,
+            resources: [],
+            occurrences: [],
+            issues: [],
+            documents: documents.items,
+            coverage: {
+              complete: header.metadata.coverage.complete,
+              findings: issues.items
+                .filter((i) => i.scope === 'coverage')
+                .map((i) => ({
+                  code: i.code as import('../shared/audit.js').CoverageFinding['code'],
+                  message: i.message,
+                })),
+            },
+          },
+        };
+      }
       return { job, results };
     },
     [token, id],
@@ -63,8 +99,9 @@ export function AuditDetail({
           <div role="status" className="progress-status">
             <span className={'badge ' + job.state}>{job.state}</span>
             <span>
-              {job.progress.phase.replaceAll('-', ' ')} · {job.progress.inspected}
-              {job.progress.total === null ? '' : ' / ' + job.progress.total} resources inspected
+              {job.progress.phase.replaceAll('-', ' ')} · {job.progress.documentsVisited ?? 0}{' '}
+              documents visited · {job.progress.inspected}
+              {job.progress.total === null ? '' : ' / ' + job.progress.total} images inspected
             </span>
           </div>
           {isActive(job) && (
@@ -78,7 +115,9 @@ export function AuditDetail({
               <p className="muted">
                 {job.state === 'queued'
                   ? 'Waiting for the worker. Make sure npm run dev:worker is running.'
-                  : 'Inspecting image metadata. Results are published when the attempt finishes.'}
+                  : job.progress.phase === 'inspecting-images'
+                    ? 'Inspecting image metadata. Results are published when the attempt finishes.'
+                    : 'Discovering documents and rendering JavaScript when enabled. Image inspection follows discovery.'}
               </p>
             </>
           )}
@@ -89,7 +128,20 @@ export function AuditDetail({
             </p>
           )}
           {data?.results?.result ? (
-            <Results id={id} result={data.results.result} />
+            <Results
+              id={id}
+              result={data.results.result}
+              {...(data.results.summary
+                ? {
+                    server: {
+                      token,
+                      summary: data.results.summary,
+                      attempt: data.results.attempt!,
+                      coveragePreviewIncomplete: data.results.coveragePreviewIncomplete ?? false,
+                    },
+                  }
+                : {})}
+            />
           ) : (
             !isActive(job) && (
               <p className="empty">No image results are available for this audit.</p>

@@ -50,7 +50,7 @@ function summarize(reply: Reply) {
   if (reply.tool === 'list_audits')
     return (
       'Found ' +
-      (data['jobs'] as unknown[]).length +
+      (data['items'] as unknown[]).length +
       ' recent audits. Expand the response for job IDs.'
     );
   if (!data['available'])
@@ -244,7 +244,9 @@ export function McpChat({ token }: { token: string }) {
             )}
             {entry.reply?.result.structuredContent?.ok &&
               entry.call?.name === 'get_audit_results' &&
-              typeof entry.reply.result.structuredContent.data?.['nextOffset'] === 'number' && (
+              typeof (
+                entry.reply.result.structuredContent.data?.['page'] as { nextCursor?: string }
+              )?.nextCursor === 'string' && (
                 <button
                   className="secondary"
                   disabled={busy}
@@ -254,9 +256,11 @@ export function McpChat({ token }: { token: string }) {
                         ...entry.call,
                         arguments: {
                           ...entry.call.arguments,
-                          offset: entry.reply!.result.structuredContent!.data![
-                            'nextOffset'
-                          ] as number,
+                          cursor: (
+                            entry.reply!.result.structuredContent!.data!['page'] as {
+                              nextCursor: string;
+                            }
+                          ).nextCursor,
                         },
                       });
                   }}

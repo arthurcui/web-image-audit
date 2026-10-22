@@ -22,7 +22,7 @@ export const demoCallSchema = z.discriminatedUnion('name', [
       id,
       section: z.literal('issues'),
       limit: z.number().int().min(1).max(20),
-      offset: z.number().int().min(0).max(1_000_000),
+      cursor: z.string().min(1).max(2048).optional(),
     }),
   }),
   z.strictObject({

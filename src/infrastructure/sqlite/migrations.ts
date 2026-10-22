@@ -1,6 +1,22 @@
+import { normalizeResultTables } from './normalize-results.js';
+const resultTables = {
+  resources: 'audit_resources',
+  occurrences: 'audit_occurrences',
+  candidates: 'audit_candidates',
+  issues: 'audit_issues',
+  documents: 'audit_documents',
+  coverage: 'audit_coverage',
+  inventory: 'audit_inventory',
+};
 import type Database from 'better-sqlite3';
 
-const migrations = [
+const resultSchema = Object.values(resultTables)
+  .map(
+    (table) =>
+      `CREATE TABLE ${table} (job_id TEXT NOT NULL, attempt INTEGER NOT NULL, ordinal INTEGER NOT NULL, data_json TEXT NOT NULL, failed INTEGER NOT NULL, oversized INTEGER NOT NULL, missing INTEGER NOT NULL, PRIMARY KEY(job_id,attempt,ordinal), FOREIGN KEY(job_id,attempt) REFERENCES audit_results(job_id,attempt) ON DELETE CASCADE) STRICT;`,
+  )
+  .join('\n');
+export const migrations = [
   {
     version: 1,
     sql: `
@@ -54,6 +70,19 @@ const migrations = [
   CREATE INDEX worker_heartbeats_time ON worker_heartbeats(heartbeat_at);
 `,
   },
+  {
+    version: 5,
+    sql:
+      `CREATE TABLE audit_results(job_id TEXT NOT NULL REFERENCES jobs(id),attempt INTEGER NOT NULL,header_json TEXT NOT NULL,PRIMARY KEY(job_id,attempt)) STRICT;` +
+      resultSchema +
+      ['failed', 'oversized', 'missing']
+        .map(
+          (filter) =>
+            `CREATE INDEX inventory_${filter} ON audit_inventory(job_id,attempt,ordinal) WHERE ${filter}=1;`,
+        )
+        .join('\n'),
+  },
+  { version: 6, sql: '' },
 ];
 
 export function migrate(db: Database.Database) {
@@ -67,6 +96,7 @@ export function migrate(db: Database.Database) {
     for (const migration of migrations) {
       if (migration.version > (current.version ?? 0)) {
         db.exec(migration.sql);
+        if (migration.version === 6) normalizeResultTables(db);
         db.prepare('INSERT INTO schema_migrations(version) VALUES (?)').run(migration.version);
       }
     }

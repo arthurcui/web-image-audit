@@ -46,7 +46,7 @@ test(
     const foreign = (
       await invoke(bob, {
         name: 'get_audit_results',
-        arguments: { id, section: 'issues', offset: 0, limit: 5 },
+        arguments: { id, section: 'issues', limit: 5 },
       })
     ).json();
     assert.equal(foreign.result.isError, true);
@@ -54,8 +54,8 @@ test(
     const lists = await Promise.all(
       [alice, bob].map((token) => invoke(token, { name: 'list_audits', arguments: { limit: 5 } })),
     );
-    assert.equal(lists[0]!.json().result.structuredContent.data.jobs[0].id, id);
-    assert.notEqual(lists[1]!.json().result.structuredContent.data.jobs[0].id, id);
+    assert.equal(lists[0]!.json().result.structuredContent.data.items[0].id, id);
+    assert.notEqual(lists[1]!.json().result.structuredContent.data.items[0].id, id);
     assert.equal((await invoke('invalid', call)).statusCode, 401);
     assert.equal(
       (await invoke(alice, { name: 'run_shell', arguments: { command: 'whoami' } })).statusCode,
@@ -66,7 +66,7 @@ test(
       (
         await invoke(alice, {
           name: 'get_audit_results',
-          arguments: { id, section: 'issues', offset: 0, limit: 999 },
+          arguments: { id, section: 'issues', limit: 999 },
         })
       ).statusCode,
       400,

@@ -1,3 +1,4 @@
+import type { ResultQuery, StoredPage } from '../shared/result-query.js';
 import type { ScanOptions } from '../shared/scan.js';
 import type { AuditResult } from '../shared/audit.js';
 import type { AuditJob as PublicAuditJob, Progress, Failure, Attempt } from '../shared/jobs.js';
@@ -17,6 +18,7 @@ export interface Claim {
 export class JobError extends Error {
   constructor(
     public readonly code:
+      | 'stale_cursor'
       | 'invalid_request'
       | 'invalid_idempotency_key'
       | 'invalid_target'
@@ -33,6 +35,11 @@ export class JobError extends Error {
 }
 /** Owner-scoped persistence boundary for AuditService; every operation requires identity. */
 export interface AuditRepository {
+  status(
+    id: string,
+    ownerId: string,
+  ): { job: AuditJob; header: import('../shared/result-query.js').ResultHeader | null } | undefined;
+  resultPage(id: string, ownerId: string, query: ResultQuery): StoredPage | undefined;
   create(
     url: string,
     key: string | undefined,

@@ -3,7 +3,7 @@ export type DemoCall =
   | { name: 'get_audit_status'; arguments: { id: string } }
   | {
       name: 'get_audit_results';
-      arguments: { id: string; section: 'issues'; limit: number; offset: number };
+      arguments: { id: string; section: 'issues'; limit: number; cursor?: string };
     }
   | { name: 'list_audits'; arguments: { limit: number } };
 
@@ -32,7 +32,7 @@ export function parseDemoCommand(input: string, lastId: string | null, key: stri
       throw new Error('Use a valid job ID.');
     return status
       ? { name: 'get_audit_status', arguments: { id } }
-      : { name: 'get_audit_results', arguments: { id, section: 'issues', limit: 5, offset: 0 } };
+      : { name: 'get_audit_results', arguments: { id, section: 'issues', limit: 5 } };
   }
   throw new Error(demoHelp);
 }

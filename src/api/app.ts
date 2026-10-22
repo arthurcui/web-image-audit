@@ -1,5 +1,7 @@
+import { Readable } from 'node:stream';
+import { exportAudit } from '../application/export-audit.js';
 import * as z from 'zod/v4';
-import { listAuditsSchema } from '../shared/inputs.js';
+
 import { httpErrorStatus } from './errors.js';
 import { getReadiness } from '../application/readiness.js';
 import type { ReadinessStore } from '../application/readiness.js';
@@ -152,7 +154,7 @@ export function buildApp(
         id: job.id,
         state: job.state,
         statusUrl,
-        resultsUrl: statusUrl + '/results',
+        imagesUrl: statusUrl + '/images',
         replayed,
       });
   });
@@ -175,32 +177,51 @@ export function buildApp(
     }
   });
   app.get<{ Params: { id: string } }>('/api/audits/:id', async (request) =>
-    audits.get(request.headers.authorization, request.params.id),
+    audits.status(request.headers.authorization, request.params.id),
   );
-  app.get<{ Params: { id: string } }>('/api/audits/:id/results', async (request) => {
-    const snapshot = audits.results(request.headers.authorization, request.params.id);
-    return {
-      id: snapshot.job.id,
-      state: snapshot.job.state,
-      available: snapshot.result !== null,
-      result: snapshot.result,
-      attempts: snapshot.attempts,
-    };
+  const querySchema = z.strictObject({
+    cursor: z.string().optional(),
+    limit: z
+      .string()
+      .regex(/^[1-9][0-9]*$/)
+      .transform(Number)
+      .optional(),
   });
-  // Query decoding is transport-specific; the shared schema owns numeric bounds.
-  const querySchema = z
-    .strictObject({
-      limit: z
-        .string()
-        .regex(/^[1-9][0-9]*$/)
-        .transform(Number)
-        .optional(),
-    })
-    .pipe(listAuditsSchema);
+  for (const [endpoint, section] of [
+    ['images', 'inventory'],
+    ['resources', 'resources'],
+    ['documents', 'documents'],
+    ['issues', 'issues'],
+  ] as const) {
+    app.get<{ Params: { id: string } }>('/api/audits/:id/' + endpoint, async (request) => {
+      const schema =
+        endpoint === 'images' ? querySchema.extend({ filter: z.string().optional() }) : querySchema;
+      const query = schema.safeParse(request.query);
+      if (!query.success) throw new JobError('invalid_request', 'Invalid page query');
+      return audits.page(request.headers.authorization, request.params.id, section, query.data);
+    });
+  }
+  app.get<{ Params: { id: string } }>('/api/audits/:id/export', async (request, reply) => {
+    const query = z.strictObject({ format: z.enum(['json', 'csv']) }).safeParse(request.query);
+    if (!query.success) throw new JobError('invalid_request', 'Invalid export format');
+    const chunks = exportAudit(
+      audits,
+      request.headers.authorization,
+      request.params.id,
+      query.data.format,
+    );
+    return reply
+      .header(
+        'Content-Disposition',
+        'attachment; filename="audit-' + request.params.id + '.' + query.data.format + '"',
+      )
+      .type(query.data.format === 'json' ? 'application/json' : 'text/csv; charset=utf-8')
+      .send(Readable.from(chunks));
+  });
   app.get('/api/audits', async (request) => {
     const query = querySchema.safeParse(request.query);
     if (!query.success) throw new JobError('invalid_request', 'Invalid audit list query');
-    return { jobs: audits.list(request.headers.authorization, query.data.limit) };
+    return audits.recent(request.headers.authorization, query.data);
   });
   return app;
 }

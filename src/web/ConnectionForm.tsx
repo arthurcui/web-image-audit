@@ -23,7 +23,7 @@ export function ConnectionForm({ onConnect }: { onConnect: (token: string) => vo
     setBusy(true);
     setError('');
     try {
-      await requestAuditApi<{ jobs: AuditJob[] }>(credential, '?limit=1', current.signal);
+      await requestAuditApi<{ items: AuditJob[] }>(credential, '?limit=1', current.signal);
       if (!current.signal.aborted) {
         setValue('');
         onConnect(credential);

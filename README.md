@@ -147,34 +147,42 @@ examples include resource-limit, candidate-limit, render-snapshot and
 browser-dependency-failed. Exact duplicate findings are deduplicated in discovery
 order. Messages can contain untrusted webpage-derived text.
 
-REST results and JSON exports use coverage.findings. MCP coverage items expose
-code/message and its summary uses coverageFindingCount. This replaces the previous
-reasons/reason/coverageReasonCount fields; update external consumers together. Restart
-API, worker and MCP processes, and reload the frontend after updating.
-Previously persisted coverage.reasons arrays are converted on read to legacy-notice
-findings without guessing codes from wording or modifying stored audit data.
+JSON exports use coverage.findings; REST /issues returns coverage and image
+findings with an explicit scope. MCP coverage items expose code/message and its
+summary uses coverageFindingCount. Migration 6 converts legacy coverage.reasons
+arrays into stored legacy-notice findings without guessing codes from wording.
+Restart API, worker and MCP processes, and reload the frontend after upgrading.
 
 ### Validation and public responses
 
-Shared Zod schemas in src/shared/inputs.ts and src/shared/scan.ts define audit
+Shared Zod schemas in src/shared/inputs.ts, src/shared/scan.ts and
+src/shared/pagination.ts define audit
 URLs, scan defaults/limits, IDs, idempotency keys and pagination inputs, with
 inferred TypeScript types. The frontend, application service and MCP reuse them.
 REST decodes query strings before shared validation; MCP keeps its stricter
 response pagination and text/byte limits in its transport layer. The shared
 service still authenticates and applies the configured host policy.
 
-Shared AuditJob and ResultsResponse are public DTOs. Service responses explicitly
-project job fields, so REST no longer exposes ownerId, availableAt or leaseUntil.
-Internal repository/worker records retain those fields. External clients relying
-on them must update; no database migration is required for this change.
+Shared AuditJob/AuditStatus and page contracts define client-visible responses.
+ResultsResponse is a frontend composition type, not a REST endpoint response.
+Services project job fields; REST excludes ownerId, availableAt and leaseUntil.
+Internal repository/worker records retain those fields. The current database
+layout requires migration 6; see the upgrade instructions below.
 
 JobError carries a typed application code and message, without an HTTP status.
 Existing codes such as invalid_request, job_not_found and idempotency_conflict
-are preserved for compatibility. The API maps codes to HTTP statuses; MCP maps
+identify application failures. The API maps codes to HTTP statuses; MCP maps
 them to sanitized tool error envelopes. UI and MCP counts both use summarizeAudit;
 engine response projection uses toFetchMetadata.
 
-## API example (PowerShell)
+## REST API contract
+
+See [API usage and endpoint reference](docs/API.md) and the machine-readable
+[OpenAPI 3.1 specification](docs/openapi.json). Import the JSON file into an
+OpenAPI-compatible viewer such as Swagger UI. The reference documents current
+request/response schemas, bearer authentication, pagination, errors and exports.
+
+### API example (PowerShell)
 
 With demo mode running, enter the demo token privately:
 
@@ -185,7 +193,7 @@ $headers = @{ Authorization = "Bearer $credential"; 'Idempotency-Key' = 'demo-00
 $body = @{ url = 'http://127.0.0.1:3105/'; scan = @{ mode = 'static'; includeIframes = $false } } | ConvertTo-Json
 $job = Invoke-RestMethod http://127.0.0.1:3001/api/audits -Method Post -Headers $headers -ContentType application/json -Body $body
 Invoke-RestMethod "http://127.0.0.1:3001$($job.statusUrl)" -Headers $headers
-Invoke-RestMethod "http://127.0.0.1:3001/api/audits/$($job.id)/results" -Headers $headers
+Invoke-RestMethod "http://127.0.0.1:3001/api/audits/$($job.id)/issues" -Headers $headers
 Invoke-RestMethod 'http://127.0.0.1:3001/api/audits?limit=10' -Headers $headers
 Remove-Variable credential,secret,headers
 ```
@@ -196,6 +204,68 @@ key and normalized URL/scan options to replay the job; a different payload retur
 and a nonexistent ID both return 404. Errors use `{ "error": { "code", "message" } }`.
 Scan modes: `static`, `rendered`, `crawl`; options include `includeIframes`,
 `maxPages` (1–20, default 10) and `maxDepth` (0–3, default 2).
+
+### Progress and pagination
+
+Status progress reports phase, documentsVisited and documentsScheduled separately
+from inspected/total image resources. Documents visited counts finished document
+attempts, including failed documents and iframe documents. The scheduled count can
+grow during discovery; it is not a predicted site total. Rendering reports its phase
+before awaiting Chromium. Counts reset for each worker attempt. Older stored jobs
+without document counters read as zero. The UI shows phase, visited documents and
+images independently, with Older audits/Newer audits navigation for the recent list.
+
+All list endpoints use `limit` and an opaque `cursor`, returning
+`{items, page: {nextCursor, hasMore}}`. Follow `page.nextCursor` unchanged as the
+URL-encoded `cursor`; do not decode or construct it. There are no public offsets.
+REST limits are 1–100 (default 20); MCP limits are 1–20 (default 10).
+
+| Endpoint | Purpose |
+| --- | --- |
+| POST /api/audits | Enqueue; returns 202, id, statusUrl, imagesUrl, replayed |
+| GET /api/audits?limit=20&cursor=... | Owned audits, newest first |
+| GET /api/audits/:id | Status/progress plus publishedResult (null until published) |
+| GET /api/audits/:id/images?filter=missing_alt&limit=20 | Joined occurrence/candidate/resource rows |
+| GET /api/audits/:id/resources | Unique resources |
+| GET /api/audits/:id/documents | Visited page/iframe documents |
+| GET /api/audits/:id/issues | Image and coverage findings, distinguished by scope |
+| GET /api/audits/:id/export?format=json | Full JSON download; format=csv also supported |
+
+Result pages also include id, state, available, attempt and total. Empty/past-end
+pages return `nextCursor:null, hasMore:false`. Filters (`all`, `failed`, `oversized`,
+`missing_alt`) apply to images before pagination. The cursor remembers its filter;
+follow-up requests need only cursor and limit. Changing an explicitly supplied
+filter requires starting a new page sequence. Tokens bind the audit, published
+attempt, section and position; they do not grant access. Every read checks ownership.
+A changed attempt/view returns HTTP 409 `stale_cursor`; restart pagination.
+Malformed or wrong-kind cursors return 400. Tokens are versioned encodings, not
+secrets or encrypted credentials.
+
+The recent list uses descending (createdAt, id) ordering. New jobs appear when
+refreshing the newest page and do not shift older page boundaries. Status can
+change between calls; this is not a database-wide snapshot. Status and its cached
+published summary are read in one short transaction.
+
+Pagination is forward-only: there is no previousCursor. To return to a previous
+page, reuse the cursor used to request that page (omit it for the first page).
+Keep the same limit for predictable page boundaries. The UI keeps this cursor
+history for Newer audits and Previous images. Without that history, start at the
+first page again. Disabled navigation buttons use a normal arrow cursor.
+
+The UI retrieves bounded documents/issues previews and image pages. It labels
+incomplete previews. Full exports stream database batches with backpressure;
+transactions end before yielding. A changed result during export aborts the stream
+rather than mixing attempts. The browser buffers the download as a Blob for
+bearer-authenticated downloads, without preloading all inventory pages.
+Raw pages target 128 KiB of item data; one larger source row is permitted for
+lossless output. Engine limits bound source size. MCP applies separate stricter
+text and response-byte budgets.
+
+Migration 6 normalizes resources, occurrences, candidates, documents and issues,
+renames jobs/attempts to audits/audit_attempts, and removes duplicate inventory
+snapshots and result_json. Existing development history is migrated transactionally.
+Stop all processes and back up SQLite before upgrading; see [operations](docs/OPERATIONS.md).
+Run `npm run benchmark:results` for local synthetic latency/size/heap diagnostics.
 
 ## MCP setup
 
