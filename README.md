@@ -7,10 +7,8 @@ repository and SQLite database. No cloud account, paid service, or LLM key is ne
 ## Recorded demo
 
 [Watch the 5-minute demo](docs/demo/website-image-audit-demo.mp4) (5:14, approximately
-11.6 MB), with synthetic male narration and visible captions. The recording follows
-the local fixture workflow in [the demo script](docs/DEMO.md).
-
-[Download subtitles](docs/demo/website-image-audit.srt) or read the
+11.6 MB), with synthetic narration and visible captions. The recording follows
+the local fixture workflow in [the demo script](docs/DEMO.md). Read the
 [narration transcript](docs/demo/transcript.txt).
 
 ## Quick start: deterministic demo
