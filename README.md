@@ -1,8 +1,21 @@
 # Website Image Audit
 
-A local portfolio application that audits image candidates in background jobs.
-React, Fastify, a separate worker and a stdio MCP server share one TypeScript
+An application that audits image candidates in background jobs.
+React frontend, Fastify API, MCP server, and a separate worker share one TypeScript
 repository and SQLite database. No cloud account, paid service, or LLM key is needed.
+
+<a href="docs/images/application-screenshot.png">
+  <img src="docs/images/application-screenshot.png" alt="Website Image Audit interface showing an audit form, crawl results, image inventory, and MCP chat" height="360">
+</a>
+
+*Click the preview to inspect the original screenshot.*
+
+<details>
+<summary>View full application screenshot</summary>
+
+![Full application screenshot showing a completed crawl with partial coverage and an image inventory](docs/images/application-screenshot.png)
+
+</details>
 
 ## Recorded demo
 
