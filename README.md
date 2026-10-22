@@ -4,6 +4,13 @@ A local portfolio application that audits image candidates in background jobs.
 React, Fastify, a separate worker and a stdio MCP server share one TypeScript
 repository and SQLite database. No cloud account, paid service, or LLM key is needed.
 
+## Recorded demo
+
+[Watch the 5-minute demo](docs/demo/website-image-audit-demo.mp4) (5:14, approximately
+11.6 MB), with synthetic narration and visible captions. The recording follows
+the local fixture workflow in [the demo script](docs/DEMO.md). Read the
+[narration transcript](docs/demo/transcript.txt).
+
 ## Quick start: deterministic demo
 
 Prerequisites: Node.js **24 LTS** (or 26), npm, and an OS supported by Playwright.
