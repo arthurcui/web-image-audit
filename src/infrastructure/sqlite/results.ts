@@ -1,3 +1,8 @@
+/**
+ * Store resources, occurrences and candidates separately; join them for bounded inventory pages.
+ * Prepare serialized rows before publication. The caller must publish under its lease-fenced
+ * transaction; reads bind cursors to a published attempt and may sort the bounded candidate set.
+ */
 import type Database from 'better-sqlite3';
 import type { AuditResult, Resource, Occurrence, Candidate } from '../../shared/audit.js';
 import { summarizeAudit } from '../../shared/summary.js';

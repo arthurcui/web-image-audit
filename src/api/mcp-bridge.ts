@@ -1,5 +1,9 @@
+/**
+ * The authenticated demo endpoint owns a short-lived stdio MCP client for each command.
+ * This client adapter lives in the API layer to manage credentials, cancellation and process
+ * cleanup; it forwards the authenticated token, never a caller-supplied user identity.
+ */
 import { auditUrlSchema, auditIdSchema, idempotencyKeySchema } from '../shared/inputs.js';
-// Lives in the API because its authenticated chat endpoint owns the MCP client process lifecycle.
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';

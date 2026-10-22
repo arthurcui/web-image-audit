@@ -1,8 +1,12 @@
+/**
+ * Stream full-fidelity JSON or formula-safe CSV from owner-scoped database batches.
+ * Each batch ends its transaction before yielding to the consumer's backpressure. All batches
+ * bind to the initial attempt; replacement aborts the export rather than mixing results.
+ */
 import type { AuditService } from './audit-service.js';
 import type { ResultCursor, InventoryRow } from '../shared/result-query.js';
 import { toCsv } from '../shared/inventory.js';
 import type { AuditResult } from '../shared/audit.js';
-/** Read a batch, release its transaction, then yield to the HTTP stream with backpressure. */
 export function exportAudit(
   service: AuditService,
   authorization: unknown,

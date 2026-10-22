@@ -1,7 +1,11 @@
+/**
+ * Migration 6 preserves JSON snapshots and version-5 result rows before replacing their tables.
+ * Run only from the migration runner inside its write transaction, with older app processes stopped.
+ * Temporary staging needs extra disk space; schema replacement and backfill roll back together.
+ */
 import type Database from 'better-sqlite3';
 import type { AuditResult } from '../../shared/audit.js';
 import { normalizedSchema, prepareResult, publishResult } from './results.js';
-/** One-time development-data upgrade, not a compatibility path in application reads. */
 export function normalizeResultTables(db: Database.Database) {
   db.exec(
     'CREATE TEMP TABLE result_upgrade(id TEXT PRIMARY KEY,attempt INTEGER NOT NULL,data_json TEXT NOT NULL)',

@@ -1,3 +1,8 @@
+/**
+ * One SQLite implementation backs owner-scoped audit reads, token storage and the privileged queue.
+ * Inject the narrow interface appropriate to each caller. Lease checks and state/result writes
+ * share short transactions; network inspection runs outside this module.
+ */
 import { resultQuerySchema } from '../../shared/result-query.js';
 import { prepareResult, publishResult, readResultPage } from './results.js';
 import type { ResultQuery } from '../../shared/result-query.js';

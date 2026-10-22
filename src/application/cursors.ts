@@ -1,3 +1,8 @@
+/**
+ * Encode versioned pagination positions for audit lists and published result views.
+ * Tokens are validated encodings, not signed credentials or authorization. The service checks
+ * ownership, and result reads verify the cursor's audit, attempt, section and filter.
+ */
 import * as z from 'zod/v4';
 import { cursorSchema } from '../shared/inputs.js';
 import { resultCursorSchema } from '../shared/result-query.js';
