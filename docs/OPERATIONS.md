@@ -66,11 +66,14 @@ Restart API, worker and MCP and reload the UI after updates that change contract
 ## Result storage upgrade (migration 6)
 
 Stop API, worker and MCP processes before upgrading. With connections closed, back
-up SQLite, run `npm run db:migrate`, then restart all processes. Do not run older
-binaries against this schema. The upgrade preserves legacy JSON and version-5
+up SQLite, run `npm run db:migrate`, then restart all processes and reload the
+frontend. Do not run older binaries against this schema. The upgrade preserves
+legacy JSON and version-5
 published rows, renames jobs/job_attempts to audits/audit_attempts, separates image
 resources/occurrences/candidates, and removes result_json and duplicate inventory
-snapshots. Coverage and image findings share audit_issues with an explicit scope.
+snapshots. Documents are stored separately; coverage and image findings share
+audit_issues with an explicit scope. Legacy coverage.reasons arrays become stored
+legacy-notice findings without guessing codes from their wording.
 Schema and backfill commit atomically; failures roll back. Large histories require
 temporary disk space and can make this one-time write transaction slow.
 

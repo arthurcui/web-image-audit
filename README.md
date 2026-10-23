@@ -19,10 +19,11 @@ repository and SQLite database. No cloud account, paid service, or LLM key is ne
 
 ## Recorded demo
 
-[Watch the 5-minute demo](docs/demo/website-image-audit-demo.mp4) (5:14, approximately
-11.6 MB), with synthetic narration and visible captions. The recording follows
-the local fixture workflow in [the demo script](docs/DEMO.md). Read the
-[narration transcript](docs/demo/transcript.txt).
+[![Watch the Website Image Audit demo on YouTube](https://img.youtube.com/vi/k7rk1CPF_ws/hqdefault.jpg)](https://youtu.be/k7rk1CPF_ws)
+
+A five-minute walkthrough with synthetic narration and visible captions. The
+recording follows the local fixture workflow in [the demo script](docs/DEMO.md).
+Read the [narration transcript](docs/demo/transcript.txt).
 
 ## Quick start: deterministic demo
 
@@ -169,9 +170,7 @@ order. Messages can contain untrusted webpage-derived text.
 
 JSON exports use coverage.findings; REST /issues returns coverage and image
 findings with an explicit scope. MCP coverage items expose code/message and its
-summary uses coverageFindingCount. Migration 6 converts legacy coverage.reasons
-arrays into stored legacy-notice findings without guessing codes from wording.
-Restart API, worker and MCP processes, and reload the frontend after upgrading.
+summary uses coverageFindingCount.
 
 ### Validation and public responses
 
@@ -186,8 +185,7 @@ service still authenticates and applies the configured host policy.
 Shared AuditJob/AuditStatus and page contracts define client-visible responses.
 ResultsResponse is a frontend composition type, not a REST endpoint response.
 Services project job fields; REST excludes ownerId, availableAt and leaseUntil.
-Internal repository/worker records retain those fields. The current database
-layout requires migration 6; see the upgrade instructions below.
+Internal repository/worker records retain those fields.
 
 JobError carries a typed application code and message, without an HTTP status.
 Existing codes such as invalid_request, job_not_found and idempotency_conflict
@@ -281,10 +279,7 @@ Raw pages target 128 KiB of item data; one larger source row is permitted for
 lossless output. Engine limits bound source size. MCP applies separate stricter
 text and response-byte budgets.
 
-Migration 6 normalizes resources, occurrences, candidates, documents and issues,
-renames jobs/attempts to audits/audit_attempts, and removes duplicate inventory
-snapshots and result_json. Existing development history is migrated transactionally.
-Stop all processes and back up SQLite before upgrading; see [operations](docs/OPERATIONS.md).
+For database upgrade and recovery procedures, see [operations](docs/OPERATIONS.md).
 Run `npm run benchmark:results` for local synthetic latency/size/heap diagnostics.
 
 ## MCP setup
