@@ -183,7 +183,7 @@ Static mode does not execute JavaScript. Optional iframe inspection and rendered
 ## Scripted chat demo in the frontend
 
 Run `npm run dev` and `npm run dev:worker`, connect the frontend using your
-provisioned demo token, and scroll to **MCP chat**. No Inspector or
+provisioned demo token in normal mode (fixture mode signs in automatically), and scroll to **MCP chat**. No Inspector or
 separately launched MCP server is needed. The API launches the real server for
 each command and closes that connection afterward. Your signed-in token is
 passed privately in the child process environment, not in tool arguments or

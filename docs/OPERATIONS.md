@@ -60,7 +60,8 @@ If Chromium cannot launch, run npm run browser:install and restart the worker.
 Historical failed jobs remain failed; submit a new audit after fixing configuration.
 
 For fixture demos, stop normal API/frontend processes before npm run demo, and
-provision with demo:token. A normal-mode token belongs to a different database.
+the browser signs in automatically as fixture-demo. Manual API/MCP clients can
+use demo:token -- fixture-demo. A normal-mode token belongs to a different database.
 Restart API, worker and MCP and reload the UI after updates that change contracts.
 
 ## Result storage upgrade (migration 6)
@@ -93,3 +94,19 @@ Run `npm run benchmark:results` for local synthetic measurements (no network,
 tokens or persistent database). Sampled heap growth reflects allocation/GC and is
 not a peak-RSS guarantee. Joined image pages may sort bounded candidate sets;
 resource pages and recent-audit keysets use indexed ordering.
+
+## Fixture automatic sign-in
+
+Only fixture mode registers POST /api/demo/session. It requires a loopback peer,
+a localhost/127.0.0.1 Host and an approved frontend Origin. It accepts no identity
+parameters. The fixed fixture-demo user receives a random bearer token, reused
+for the API process lifetime; only its hash is stored in the isolated demo database.
+Browser memory holds the token; neither localStorage nor sessionStorage is used.
+REST and the MCP bridge still authenticate and enforce ownership. Normal mode
+returns 404 for this endpoint and still requires manually provisioned credentials.
+
+All local fixture viewers share that demo identity and its history. This is demo
+convenience, not user isolation between local viewers or production authentication.
+Disconnect clears browser state; reload signs in again. Existing audits belonging
+to other provisioned users stay private. API restarts issue a new credential;
+previous token hashes follow the existing no-expiry demo token behavior.

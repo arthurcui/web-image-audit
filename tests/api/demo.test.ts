@@ -86,3 +86,72 @@ test('API and worker logs correlate audit IDs without tokens, query strings, or 
   assert.ok(!logs.includes('https://'));
   for (const line of logs.trim().split('\n')) assert.doesNotThrow(() => JSON.parse(line));
 });
+
+test('fixture bootstrap is local-only, fixed-identity, and retains ownership checks', async (t) => {
+  const store = new SqliteJobStore(':memory:');
+  let logs = '';
+  const app = buildApp({
+    store,
+    fixtureMode: true,
+    approvedHosts: ['example.com'],
+    logger: true,
+    logStream: new Writable({
+      write(chunk, _encoding, done) {
+        logs += String(chunk);
+        done();
+      },
+    }),
+  });
+  const normal = buildApp();
+  t.after(async () => {
+    await app.close();
+    await normal.close();
+    store.close();
+  });
+  const headers = { origin: 'http://127.0.0.1:5173', host: '127.0.0.1:3001' };
+  const request = {
+    method: 'POST' as const,
+    url: '/api/demo/session',
+    headers,
+    remoteAddress: '127.0.0.1',
+  };
+  assert.equal((await normal.inject(request)).statusCode, 404);
+  assert.equal((await app.inject({ ...request, remoteAddress: '192.0.2.1' })).statusCode, 403);
+  assert.equal(
+    (await app.inject({ ...request, headers: { ...headers, origin: 'https://evil.example' } }))
+      .statusCode,
+    403,
+  );
+  assert.equal(
+    (await app.inject({ ...request, headers: { ...headers, host: 'evil.example' } })).statusCode,
+    403,
+  );
+  assert.equal((await app.inject({ ...request, headers: { host: headers.host } })).statusCode, 403);
+  assert.equal((await app.inject({ ...request, payload: { userId: 'victim' } })).statusCode, 400);
+  const response = await app.inject(request);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['cache-control'], 'no-store');
+  const token = response.json<{ token: string }>().token;
+  assert.match(token, /^wia_[A-Za-z0-9_-]{43}$/);
+  assert.equal((await app.inject(request)).json().token, token);
+  const authorization = 'Bearer ' + token;
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/audits',
+    headers: { authorization },
+    payload: { url: 'https://example.com/' },
+  });
+  assert.equal(created.statusCode, 202);
+  const id = created.json().id;
+  const other = 'Bearer ' + provisionToken(store, 'other-user');
+  assert.equal(
+    (await app.inject({ url: '/api/audits/' + id, headers: { authorization: other } })).statusCode,
+    404,
+  );
+  assert.equal((await app.inject('/api/audits')).statusCode, 401);
+  assert.equal(
+    (await normal.inject({ url: '/api/audits', headers: { authorization } })).statusCode,
+    401,
+  );
+  assert.ok(!logs.includes(token));
+});

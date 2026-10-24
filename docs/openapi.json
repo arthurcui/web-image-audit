@@ -1233,6 +1233,88 @@
           }
         }
       }
+    },
+    "/api/demo/session": {
+      "post": {
+        "operationId": "fixtureSession",
+        "summary": "Sign in to the local fixture demo",
+        "description": "Fixture mode only; otherwise 404. Requires a loopback peer, localhost/127.0.0.1 Host, and an approved local frontend Origin. Returns a real bearer token for the fixed fixture-demo owner, reused per API lifetime. Only its hash is persisted. No caller-selected identity. Cache-Control: no-store.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "http://localhost or http://127.0.0.1 on port 5173 or 4173"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Fixture credential; retain only in memory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "token"
+                  ],
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "pattern": "^wia_[A-Za-z0-9_-]{43}$"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unexpected body fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Non-local or disallowed origin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available in normal mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

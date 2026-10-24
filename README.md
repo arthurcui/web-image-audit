@@ -19,11 +19,10 @@ repository and SQLite database. No cloud account, paid service, or LLM key is ne
 
 ## Recorded demo
 
-[![Watch the Website Image Audit demo on YouTube](https://img.youtube.com/vi/k7rk1CPF_ws/hqdefault.jpg)](https://youtu.be/k7rk1CPF_ws)
+[![Watch the Website Image Audit demo on YouTube](https://img.youtube.com/vi/c02-FO0BsCw/hqdefault.jpg)](https://youtu.be/c02-FO0BsCw)
 
-A five-minute walkthrough with synthetic narration and visible captions. The
+A 6-minute walkthrough with synthetic narration and visible captions. The
 recording follows the local fixture workflow in [the demo script](docs/DEMO.md).
-Read the [narration transcript](docs/demo/transcript.txt).
 
 ## Quick start: deterministic demo
 
@@ -37,14 +36,14 @@ From the repository root:
 ```sh
 npm ci
 npm run browser:install
-npm run demo:token -- presenter
 npm run demo
 ```
 
-The token command prints a new opaque token once. Copy it into the connection
-screen at http://127.0.0.1:5173; never put it in Git or share it in screenshots.
-The token stays in frontend memory. The launcher starts the fixture, API, worker
-and frontend; Ctrl+C stops its child processes.
+Open http://127.0.0.1:5173. Fixture mode signs in automatically as the shared
+`fixture-demo` identity; no token entry is needed. A real bearer token stays in
+browser memory, and ownership checks still apply. Disconnect clears it; reload
+signs in again. Normal mode still requires a provisioned token.
+The launcher starts the fixture, API, worker and frontend; Ctrl+C stops its children.
 
 The **FIXTURE MODE** banner confirms the isolated database at
 `data/demo/audits.sqlite`. This mode ignores normal database/host settings and
@@ -63,6 +62,9 @@ The intentionally broken image makes coverage partial; the job still completes.
 | Empty alt (possibly decorative) | 1 |
 | HTTP 404 resources | 1 |
 | Oversized resources (>500,000 bytes) | 1 |
+
+The fixture uses local landscape illustrations in padded cards, with captions
+explaining each case. Responsive images switch between sunset and daylight views.
 
 The large resource is valid SVG containing a deterministic padded comment, not a
 claim that large dimensions cause large file sizes. For optional rendered/iframe
@@ -202,7 +204,8 @@ request/response schemas, bearer authentication, pagination, errors and exports.
 
 ### API example (PowerShell)
 
-With demo mode running, enter the demo token privately:
+For manual API calls, provision a fixture token with `npm run demo:token -- fixture-demo`
+(use `npm run auth:token -- your-user-id` in normal mode), then enter it privately:
 
 ```powershell
 $secret = Read-Host 'Demo token' -AsSecureString

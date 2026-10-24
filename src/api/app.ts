@@ -9,7 +9,7 @@ import Fastify from 'fastify';
 import { McpDemoBridge, demoCallSchema } from './mcp-bridge.js';
 import type { Writable } from 'node:stream';
 import { getHealth } from '../application/health.js';
-import { DemoAuth } from '../application/auth.js';
+import { DemoAuth, provisionToken } from '../application/auth.js';
 import type { TokenRepository } from '../application/auth.js';
 import { AuditService } from '../application/audit-service.js';
 import { JobError } from '../application/jobs.js';
@@ -139,6 +139,25 @@ export function buildApp(
     ...getHealth(),
     ...(options.fixtureMode ? { mode: 'fixture' } : {}),
   }));
+  // Fixture bootstrap still issues a real owner-scoped credential for REST and MCP.
+  // Reuse one token per API lifetime rather than creating one on every page reload.
+  if (options.fixtureMode) {
+    let fixtureToken: string | undefined;
+    app.post('/api/demo/session', async (request) => {
+      if (
+        !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.ip) ||
+        !['127.0.0.1', 'localhost'].includes(request.hostname) ||
+        !request.headers.origin ||
+        !origins.has(request.headers.origin)
+      )
+        throw new JobError('origin_not_allowed', 'Fixture sign-in requires a local frontend');
+      if (!z.strictObject({}).safeParse(request.body ?? {}).success)
+        throw new JobError('invalid_request', 'Fixture sign-in accepts no identity or options');
+      fixtureToken ??= provisionToken(store, 'fixture-demo');
+      return { token: fixtureToken };
+    });
+    app.options('/api/demo/session', async (_request, reply) => reply.code(204).send());
+  }
   app.post('/api/audits', async (request, reply) => {
     const { job, replayed } = audits.create(
       request.headers.authorization,

@@ -9,7 +9,8 @@ runtime service or downloading browser assets.
 
 Base URL: `http://127.0.0.1:3001`. API and worker must share the database. All
 `/api/audits` calls require `Authorization: Bearer <demo-token>`. Provision tokens
-with `npm run auth:token -- <user>`; fixture mode uses `npm run demo:token`.
+with `npm run auth:token -- <user>`; manual fixture clients use
+`npm run demo:token -- fixture-demo`. The fixture browser signs in automatically.
 Do not put tokens in URLs or shared examples. Opening an authenticated endpoint
 in the address bar does not send the header. Health/readiness are unauthenticated.
 
@@ -18,6 +19,7 @@ in the address bar does not send the header. Health/readiness are unauthenticate
 | Method and path | Request | Successful response |
 | --- | --- | --- |
 | GET /api/health | None | 200 `Health`: status=ok, service; mode=fixture when enabled |
+| POST /api/demo/session | Fixture mode only; local Host, loopback peer, approved Origin; no body or empty object | 200 `{token}` for fixed fixture-demo identity; normal mode 404 |
 | GET /api/ready | None | 200 `Readiness`; 503 with the same schema when unavailable |
 | POST /api/audits | `CreateAudit` JSON; optional Idempotency-Key header | 202 `CreatedAudit`; Location header identifies status URL |
 | GET /api/audits | limit, cursor | 200 `AuditPage`: owned audits, newest first |

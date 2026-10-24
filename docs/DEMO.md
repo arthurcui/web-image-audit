@@ -2,10 +2,10 @@
 
 ## Before the meeting (not part of the five minutes)
 
-Run the README quick start, including browser installation and `demo:token`.
+Run the README quick start, including browser installation.
 Stop normal app processes to free ports; run `npm run demo`. Confirm the frontend
 FIXTURE MODE banner and the labeled fixture at http://127.0.0.1:3105/.
-Sign in with the freshly provisioned token without displaying it to the audience.
+Open the frontend; fixture mode signs in automatically as the shared demo user.
 Run `npm run check:all` ahead of time. Keep worker logs visible in a second pane.
 Do not use a live public site for the core demo. No LLM key is needed.
 
@@ -19,7 +19,8 @@ the request does not wait for network inspection.” Show the README diagram.
 
 Submit http://127.0.0.1:3105/ as Static page, frames off. Wait for completed.
 Expected: 5 resources, 6 occurrences, 7 candidates. Point out the shared image
-with different alt attributes, dedicated small responsive fallback, wide source, 404 and padded large SVG. Resize the fixture below/above 768 px to show the responsive switch; the oversized image displays at up to 1200 x 600.
+with different alt attributes, sunset responsive fallback, wide daylight source,
+404 and large coastal SVG. Captions sit outside the images; cards provide spacing. Resize the fixture below/above 768 px to show the responsive switch; the oversized image displays at up to 1200 x 600.
 “One broken resource does not make the job fail; it makes coverage partial.”
 
 ## 1:40–2:30 — Review without overclaiming
@@ -53,8 +54,10 @@ Finish with what is verified and what would change before public hosting.
 
 ## Recovery
 
-If a port is occupied, stop the existing app before re-running demo. If a token
-fails, provision with `demo:token` (normal tokens use a different database).
+If a port is occupied, stop the existing app before re-running demo. If automatic
+sign-in fails, check that the fixture API is running and select Connect to demo.
+Manual API/MCP clients can use `demo:token -- fixture-demo`; normal-mode tokens
+belong to a different database.
 If rendering cannot launch, run `browser:install`; the core static demonstration
 still works. Historical failed audits remain failed; submit a new job after repair.
 Never claim a public website or browser-dependent result has deterministic counts.
