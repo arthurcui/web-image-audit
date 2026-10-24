@@ -35,11 +35,13 @@ test('OpenAPI references resolve, documented routes exist, and actual responses 
     await app.close();
     store.close();
   });
+  const fixtureApp = buildApp({ fixtureMode: true });
+  t.after(() => fixtureApp.close());
   for (const [path, operations] of Object.entries(spec.paths))
     for (const method of Object.keys(operations)) {
       assert.ok(method === 'get' || method === 'post');
       assert.ok(
-        app.hasRoute({
+        (path === '/api/demo/session' ? fixtureApp : app).hasRoute({
           method: method === 'get' ? 'GET' : 'POST',
           url: path.replace('{id}', ':id'),
         }),

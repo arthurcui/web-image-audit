@@ -85,3 +85,7 @@ this checklist does not assert that a remote workflow or required check passed.
 - [x] Documentation cross-check covers current routes, forward-only cursors, migration 6 and ERD constraints.
 
 - [x] Current REST endpoint contracts documented in OpenAPI and API usage guide.
+
+- [x] Refresh demo fixture with local landscape illustrations, padded image cards, and responsive captions; preserve deterministic audit cases.
+
+- [x] Fixture browser automatic sign-in via loopback-only bootstrap; normal bearer authentication and ownership remain enforced.

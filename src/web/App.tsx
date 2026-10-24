@@ -8,16 +8,42 @@ import { McpChat } from './McpChat.js';
 export function App() {
   const [token, setToken] = useState<string | null>(null);
   const [fixture, setFixture] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    void fetch('/api/health', { signal: controller.signal })
-      .then((r) => r.json())
-      .then((v: { mode?: string }) => {
-        if (!controller.signal.aborted) setFixture(v.mode === 'fixture');
-      })
-      .catch(() => {});
+    void (async () => {
+      try {
+        const health = await fetch('/api/health', { signal: controller.signal });
+        if (!health.ok) return;
+        const value = (await health.json()) as { mode?: string };
+        if (controller.signal.aborted) return;
+        setFixture(value.mode === 'fixture');
+        if (value.mode !== 'fixture') return;
+        setConnecting(true);
+        setConnectionError(null);
+        const response = await fetch('/api/demo/session', {
+          method: 'POST',
+          signal: controller.signal,
+        });
+        if (!response.ok)
+          throw new Error('Fixture sign-in failed. Check the local demo API and retry.');
+        const session = (await response.json()) as { token?: unknown };
+        if (typeof session.token !== 'string' || !/^wia_[A-Za-z0-9_-]{43}$/.test(session.token))
+          throw new Error('Fixture sign-in returned an invalid response.');
+        if (!controller.signal.aborted) setToken(session.token);
+      } catch (error) {
+        if (!controller.signal.aborted)
+          setConnectionError(
+            error instanceof Error ? error.message : 'Unable to connect to the demo.',
+          );
+      } finally {
+        if (!controller.signal.aborted) setConnecting(false);
+      }
+    })();
     return () => controller.abort();
-  }, []);
+  }, [connectionAttempt]);
   return (
     <main>
       <header>
@@ -36,7 +62,7 @@ export function App() {
       {fixture && (
         <p className="notice" role="status">
           <strong>FIXTURE MODE</strong> · Isolated demo database. Only http://127.0.0.1:3105 is
-          approved.
+          approved. Automatic sign-in uses a shared fixture identity.
         </p>
       )}
       <section className="intro">
@@ -51,7 +77,22 @@ export function App() {
         </p>
       </section>
       {token === null ? (
-        <ConnectionForm onConnect={setToken} />
+        fixture ? (
+          <section className="panel" aria-label="Fixture connection">
+            {connecting ? (
+              <p role="status">Connecting to the local fixture…</p>
+            ) : (
+              <>
+                {connectionError && <p role="alert">{connectionError}</p>}
+                <button onClick={() => setConnectionAttempt((value) => value + 1)}>
+                  Connect to demo
+                </button>
+              </>
+            )}
+          </section>
+        ) : (
+          <ConnectionForm onConnect={setToken} />
+        )
       ) : (
         <>
           <AuditWorkspace token={token} />
@@ -61,7 +102,7 @@ export function App() {
       <footer>
         Static or rendered scans · Local processing · No remote image previews
         <br />
-        Demo authentication. Your token stays in memory and is cleared on disconnect or reload.
+        Demo authentication. Tokens stay in memory. Fixture mode signs in automatically on reload.
       </footer>
     </main>
   );

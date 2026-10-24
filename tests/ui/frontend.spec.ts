@@ -453,3 +453,31 @@ test('inventory uses database pages and resets the cursor when the filter change
   await expect(page.getByRole('button', { name: 'Previous images', exact: true })).toBeDisabled();
   expect(queries.length).toBeGreaterThanOrEqual(3);
 });
+
+test('fixture auto sign-in supports retry and disconnect without persisting credentials', async ({
+  page,
+}) => {
+  await page.route('**/api/health', (route) => respond(route, { status: 'ok', mode: 'fixture' }));
+  let calls = 0;
+  await page.route('**/api/demo/session', (route) => {
+    calls++;
+    return respond(
+      route,
+      calls === 1 ? { error: { message: 'Unavailable' } } : { token: fixtureToken },
+      calls === 1 ? 503 : 200,
+    );
+  });
+  await page.goto('/');
+  await expect(page.getByRole('alert')).toContainText('Fixture sign-in failed');
+  await page.getByRole('button', { name: 'Connect to demo', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Start audit', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Local demo token')).toHaveCount(0);
+  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Connect to demo', exact: true })).toBeVisible();
+  expect(calls).toBe(2);
+  await page.getByRole('button', { name: 'Connect to demo', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Start audit', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Start audit', exact: true })).toBeVisible();
+});

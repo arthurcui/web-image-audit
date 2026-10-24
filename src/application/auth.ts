@@ -8,7 +8,7 @@ export interface TokenRepository {
 export function tokenHash(token: string) {
   return createHash('sha256').update(token).digest('hex');
 }
-/** Provisioning is a trusted local operation, never an HTTP endpoint. */
+/** Provision for a trusted local identity; only fixture bootstrap exposes a fixed demo identity. */
 export function provisionToken(store: TokenRepository, userId: string): string {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(userId)) {
     throw new Error(
