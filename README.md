@@ -31,11 +31,11 @@ Runs locally through a web UI or MCP tools, without a cloud account or LLM key.
 
 ## Recorded demo
 
-[![Watch the Website Image Audit demo on YouTube](https://img.youtube.com/vi/c02-FO0BsCw/hqdefault.jpg)](https://youtu.be/c02-FO0BsCw)
+[![Watch the Website Image Audit demo on YouTube](https://img.youtube.com/vi/O9vKUJqQCI4/hqdefault.jpg)](https://youtu.be/O9vKUJqQCI4)
 
-A 6-minute walkthrough with synthetic narration and visible captions, using the
-local fixture. The [revised five-minute demo script](docs/DEMO.md) starts with the
-problems the app helps you find; it has not yet been recorded.
+A 6.5 minute walkthrough with narration and visible
+captions. It demonstrates the local fixture, actionable findings, MCP calls, and
+design highlights. See the [demo outline](docs/DEMO.md).
 
 ## Quick start: deterministic demo
 
