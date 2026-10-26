@@ -1,3 +1,4 @@
+// Test token hashing and owner isolation.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { TestContext } from 'node:test';

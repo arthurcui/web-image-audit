@@ -1,3 +1,4 @@
+// Load and poll the selected audit status and display its results.
 import { useCallback, useEffect, useRef } from 'react';
 import type { AuditJob, AuditStatus } from '../shared/jobs.js';
 import { isActive, requestAuditApi } from './client.js';

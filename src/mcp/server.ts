@@ -1,3 +1,4 @@
+// Expose validated audit tools through shared services and ownership checks.
 import { opaqueCursorSchema, pageInfoSchema } from '../shared/pagination.js';
 import { createAuditSchema, idempotencyKeySchema, auditIdSchema } from '../shared/inputs.js';
 import { McpServer } from '@modelcontextprotocol/server';

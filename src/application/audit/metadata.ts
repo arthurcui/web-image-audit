@@ -1,3 +1,4 @@
+// Project fetch outcomes without retaining bodies or private transport details.
 import type { FetchResult } from '../../shared/audit.js';
 
 export function toFetchMetadata(result: FetchResult): FetchResult {

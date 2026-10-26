@@ -1,3 +1,4 @@
+// Define engine options, limits, and progress hooks.
 import type { ScanOptions } from '../../shared/scan.js';
 export interface AuditOptions {
   scan?: ScanOptions;

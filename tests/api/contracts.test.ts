@@ -1,3 +1,4 @@
+// Test shared validation and REST response contracts.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAuditSchema } from '../../src/shared/inputs.js';

@@ -1,3 +1,4 @@
+// Test result pagination, publication, and cursor consistency.
 import { migrations } from '../../src/infrastructure/sqlite/migrations.js';
 import { encodeCursor, decodeCursor } from '../../src/application/cursors.js';
 import type { InventoryRow } from '../../src/shared/result-query.js';

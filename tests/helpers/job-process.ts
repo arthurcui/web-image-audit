@@ -1,3 +1,4 @@
+// Run queue operations in a child process for concurrency tests.
 import { SqliteJobStore } from '../../src/infrastructure/sqlite/job-store.js';
 
 const [path, action] = process.argv.slice(2);

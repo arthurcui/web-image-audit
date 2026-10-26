@@ -1,11 +1,7 @@
 # REST API reference
 
-The machine-readable contract is [openapi.json](openapi.json), using
-[OpenAPI 3.1.1](https://spec.openapis.org/oas/v3.1.1.html). It contains request and
-response schemas for every application HTTP endpoint. Import the file into a
-trusted local OpenAPI-compatible viewer such as Swagger UI. This repository does
-not host a Swagger UI page; the checked-in specification works without adding a
-runtime service or downloading browser assets.
+[OpenAPI 3.1](openapi.json) defines exhaustive request/response schemas and can be
+imported into Swagger UI. This guide explains usage and behavioral guarantees.
 
 Base URL: `http://127.0.0.1:3001`. API and worker must share the database. All
 `/api/audits` calls require `Authorization: Bearer <demo-token>`. Provision tokens
@@ -140,12 +136,9 @@ Errors use `{"error":{"code":"...","message":"..."}}`:
 | 500 | internal_error with sanitized details |
 | 503 | database_busy (Retry-After: 1), demo_busy, mcp_unavailable |
 
-Readiness is the exception to that error envelope: 503 returns status=not_ready and
-checks.database/checks.worker. Readiness measures database access and a fresh worker
-heartbeat, not Chromium installation or external-network reachability.
+Readiness is the exception to that error envelope: 503 returns `status=not_ready`
+and `checks.database/checks.worker`; see [probe semantics](OPERATIONS.md#liveness-and-readiness).
 
-The demo bridge accepts only the scripted subset described by DemoCall; it uses the
-bearer identity, never caller-provided owner IDs. It allows four concurrent calls,
-an eight-second deadline and a 64 KiB MCP result limit. A successful HTTP exchange
-can contain a tool error (`result.isError=true`); inspect the MCP result. See
-[MCP.md](MCP.md) for the stdio tool contracts and structured data envelopes.
+The demo bridge uses the bearer identity and allowlisted `DemoCall` shapes.
+A 200 HTTP response can contain a tool error (`result.isError=true`). See
+[MCP bridge limits and behavior](MCP.md#scripted-chat-and-trust-boundary).

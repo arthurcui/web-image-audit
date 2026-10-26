@@ -1,3 +1,4 @@
+// Provision a demo user token and print its plaintext value once.
 import { provisionToken } from '../application/auth.js';
 import { readConfig } from '../config.js';
 import { SqliteJobStore } from '../infrastructure/sqlite/job-store.js';

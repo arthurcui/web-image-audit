@@ -1,3 +1,4 @@
+// Define public job, progress, status, and composed result contracts.
 import type { summarizeAudit } from './summary.js';
 import type { AuditResult } from './audit.js';
 import type { ScanOptions } from './scan.js';

@@ -1,3 +1,4 @@
+// Collect stable coverage findings without duplicate entries.
 import type { CoverageCode, CoverageFinding } from '../../shared/audit.js';
 
 /** Deduplicate exact findings while preserving first-seen order. Codes never depend on display text. */

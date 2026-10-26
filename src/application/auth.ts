@@ -1,3 +1,4 @@
+// Provision opaque tokens and authenticate callers using stored token hashes.
 import { createHash, randomBytes } from 'node:crypto';
 import { JobError } from './jobs.js';
 

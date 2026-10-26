@@ -1,3 +1,4 @@
+// Run document discovery and resource inspection to assemble an audit result.
 import { toFetchMetadata } from './metadata.js';
 import { collectDocuments } from './documents.js';
 import { createFetcher } from './adapters/http-fetcher.js';

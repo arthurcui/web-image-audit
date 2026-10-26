@@ -1,3 +1,4 @@
+// Evaluate database access and worker heartbeat freshness for readiness.
 import type { ReadinessResponse } from '../shared/health.js';
 
 export const workerHeartbeatIntervalMs = 5_000;

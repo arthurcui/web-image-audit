@@ -1,3 +1,4 @@
+// Test persistent claims, retries, crash recovery, and idempotency.
 import type { InjectOptions } from 'fastify';
 import { provisionToken } from '../../src/application/auth.js';
 import assert from 'node:assert/strict';

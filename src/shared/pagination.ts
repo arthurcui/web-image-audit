@@ -1,3 +1,4 @@
+// Define shared cursor and page-envelope validation schemas.
 import * as z from 'zod/v4';
 export const opaqueCursorSchema = z
   .string()

@@ -1,3 +1,4 @@
+// Test database and worker readiness transitions.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtemp, rm } from 'node:fs/promises';

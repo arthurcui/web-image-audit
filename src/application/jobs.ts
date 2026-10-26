@@ -1,3 +1,4 @@
+// Define owner-scoped repository contracts and privileged worker queue operations.
 import type { ResultQuery, StoredPage } from '../shared/result-query.js';
 import type { ScanOptions } from '../shared/scan.js';
 import type { AuditResult } from '../shared/audit.js';

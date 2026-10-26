@@ -1,3 +1,4 @@
+// Test OpenAPI agreement with live API contracts.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

@@ -1,112 +1,88 @@
 # Local operations
 
-For installation and configuration, start with the [README](../README.md).
-For client/tool reference, see [MCP](MCP.md). Architecture and consistency decisions
-are in [DECISIONS](DECISIONS.md).
+Start with [setup and configuration](../README.md#quick-start-deterministic-demo).
+Design trade-offs and schema are in [decisions](DECISIONS.md); endpoint contracts
+are in [API](API.md).
 
-## Persistence and migrations
+## Database and upgrades
 
-Normal mode uses data/audits.sqlite (or AUDIT_DB_PATH); fixture mode uses
-its isolated data/demo/audits.sqlite. Keep API, worker and MCP on the same database.
-Connections are initialized in src/infrastructure/sqlite/connection.ts; it enables
-WAL, FULL synchronization, foreign keys and a one-second busy timeout, then applies
-versioned migrations. The single SQLite repository implements AuditRepository,
-WorkerQueue, TokenRepository and readiness operations.
+API, worker, MCP, and token provisioning must use the same database:
+`data/audits.sqlite` (or `AUDIT_DB_PATH`), or isolated `data/demo/audits.sqlite`
+in fixture mode. Connections enable WAL, FULL synchronization, foreign keys,
+and a one-second busy timeout; startup applies versioned migrations.
 
-Run npm run db:migrate to apply migrations explicitly. Its entry point is
-src/cli/migrate.ts. Token provisioning runs src/cli/provision-token.ts through
-npm run auth:token (normal) or npm run demo:token (fixture). Newly generated tokens
-print once; never capture them in shared logs. Databases and browser downloads are ignored.
+To upgrade safely:
+
+1. Stop API, worker, and MCP; back up SQLite with all connections closed.
+2. Run `npm run db:migrate`.
+3. Restart all processes and reload the frontend. Do not use older binaries
+   against the upgraded schema or manually edit published result rows.
+
+**Migration 6** preserves legacy JSON/version-5 results, renames jobs/attempts,
+normalizes resources/occurrences/candidates, and removes duplicated snapshots.
+Legacy coverage strings become `legacy-notice` findings. Schema changes and
+backfill commit atomically or roll back together; allow temporary disk space
+and time for its write lock.
 
 ## Liveness and readiness
 
-GET /api/health is API liveness and does not depend on the worker or database.
+| Probe | Meaning |
+| --- | --- |
+| `GET /api/health` | API liveness, independent of dependencies |
+| `GET /api/ready` | 200 when SQLite access/write-lock acquisition succeeds and any worker heartbeat is newer than 15 seconds; otherwise 503 |
 
-`GET /api/ready` is an unauthenticated local readiness probe. It returns HTTP 200
-only when SQLite schema access/write-lock acquisition succeeds and at least one
-worker has a heartbeat newer than 15 seconds; otherwise it returns HTTP 503:
-
-```json
-{"status":"ready","checks":{"database":"ready","worker":"ready"}}
+```sh
+curl -i http://127.0.0.1:3001/api/ready
 ```
 
-A missing/stale worker reports `worker: "unavailable"`. A database failure reports
-`database: "unavailable"` and `worker: "unknown"`, without SQL, paths, identities,
-or exception details. Both probes use Cache-Control: no-store. Example:
-`curl -i http://127.0.0.1:3001/api/ready`.
+Readiness returns `status` and `checks.database` / `checks.worker`. A database
+failure makes worker status `unknown`; unavailable checks expose no raw errors.
+Both probes disable caching. Workers renew presence every five seconds, even
+while idle; shutdown removes presence before draining work. After a crash,
+readiness can remain positive for up to 15 seconds.
 
-Migration 4 stores worker presence separately from job leases. Idle and busy workers
-renew every 5 seconds; shutdown removes their own record before draining work.
-After a crash, readiness can remain positive for up to 15 seconds. Multiple workers
-are supported: any fresh worker is sufficient. Expired records are pruned on renewal.
-Restart API and worker after upgrading so both use the same migrated database.
+The database probe uses a short transaction and the one-second busy timeout.
+It does not check disk integrity, free space, or future durability. Worker
+presence does not prove spare capacity, approved hosts, or Chromium availability.
 
-The database probe uses a short transaction with the existing one-second SQLite
-busy timeout; it does not modify audit data. It checks access and write-lock
-availability, not disk integrity, free space, or future write durability. Worker
-presence does not guarantee queue capacity, successful audits, approved target
-hosts, or Chromium availability. Liveness stays independent of these checks.
+## Recovery
 
-## Shutdown and recovery
+| Symptom | Action |
+| --- | --- |
+| Jobs stay queued | Check readiness; start the worker using the API's database |
+| Database unavailable | Check path, permissions, and competing SQLite writers |
+| Chromium cannot launch | Run `npm run browser:install`, then restart the worker |
+| Host rejected | Explicitly approve required hosts in normal configuration; restart processes |
+| Demo port occupied | Stop the conflicting process before `npm run demo` |
+| Fixture sign-in fails | Confirm fixture API is running, then select **Connect to demo** |
+| `stale_cursor` (409) | Restart pagination |
+| Export interrupted | Retry the entire download; do not combine partial files |
 
-The API closes requests/connections on shutdown. The worker stops accepting jobs,
-removes its presence record and drains its current job while renewing that job's
-lease. A crash leaves a lease which another worker can recover after expiry;
-stale workers cannot publish results. No OS power-loss guarantee is claimed.
+Historical failed audits stay failed; submit a new job after fixing configuration.
+On shutdown the API closes connections; the worker stops claiming and drains its
+current bounded job while renewing its lease. Crash recovery follows lease expiry;
+see [consistency guarantees](DECISIONS.md#leases-and-stale-worker-fencing).
 
-If jobs stay queued, check /api/ready and start the matching worker. If a database
-probe fails, check the local path, file permissions and competing SQLite writers.
-If Chromium cannot launch, run npm run browser:install and restart the worker.
-Historical failed jobs remain failed; submit a new audit after fixing configuration.
+## Fixture credentials
 
-For fixture demos, stop normal API/frontend processes before npm run demo, and
-the browser signs in automatically as fixture-demo. Manual API/MCP clients can
-use demo:token -- fixture-demo. A normal-mode token belongs to a different database.
-Restart API, worker and MCP and reload the UI after updates that change contracts.
+Fixture-only `POST /api/demo/session` requires a loopback peer, local Host, and
+approved frontend Origin. It accepts no identity parameters. A random token for
+`fixture-demo` is reused for the API process lifetime; only its hash is stored.
+All fixture viewers share that identity/history. Browser memory holds the token;
+disconnect clears it and reload signs in again. Normal mode returns 404.
 
-## Result storage upgrade (migration 6)
+Manual clients use `npm run demo:token -- fixture-demo`; normal tokens come from
+`npm run auth:token -- <user>` and belong to a different database. Tokens print
+once; do not put them in logs or tracked files. Demo tokens have no expiry or
+revocation UI, including credentials from earlier API sessions.
 
-Stop API, worker and MCP processes before upgrading. With connections closed, back
-up SQLite, run `npm run db:migrate`, then restart all processes and reload the
-frontend. Do not run older binaries against this schema. The upgrade preserves
-legacy JSON and version-5
-published rows, renames jobs/job_attempts to audits/audit_attempts, separates image
-resources/occurrences/candidates, and removes result_json and duplicate inventory
-snapshots. Documents are stored separately; coverage and image findings share
-audit_issues with an explicit scope. Legacy coverage.reasons arrays become stored
-legacy-notice findings without guessing codes from their wording.
-Schema and backfill commit atomically; failures roll back. Large histories require
-temporary disk space and can make this one-time write transaction slow.
+## Logs and diagnostics
 
-Publication prepares rows outside its transaction, then checks the worker lease
-under the write lock and atomically publishes rows, summary and terminal state.
-Expired workers cannot overwrite results. No transaction spans network I/O or
-export yields. Do not manually modify published rows.
+Worker events include audit IDs and attempts, excluding tokens, target URLs,
+bodies, and raw exceptions. MCP stdout is reserved for protocol messages.
+Authenticated results and exports still contain target URLs; handle them privately.
 
-Result cursors refer to immutable published attempts. HTTP 409 stale_cursor means
-restart pagination. If a result changes during a streamed export, restart the
-failed download. Raw pages target 128 KiB of item data, allowing one oversized row
-for lossless output; engine input limits bound source size. MCP additionally clips
-text and limits item JSON to 20,000 bytes. Only exports reconstruct the full public
-audit; interactive endpoints use bounded pages and cached summary metadata.
-
-Run `npm run benchmark:results` for local synthetic measurements (no network,
-tokens or persistent database). Sampled heap growth reflects allocation/GC and is
-not a peak-RSS guarantee. Joined image pages may sort bounded candidate sets;
-resource pages and recent-audit keysets use indexed ordering.
-
-## Fixture automatic sign-in
-
-Only fixture mode registers POST /api/demo/session. It requires a loopback peer,
-a localhost/127.0.0.1 Host and an approved frontend Origin. It accepts no identity
-parameters. The fixed fixture-demo user receives a random bearer token, reused
-for the API process lifetime; only its hash is stored in the isolated demo database.
-Browser memory holds the token; neither localStorage nor sessionStorage is used.
-REST and the MCP bridge still authenticate and enforce ownership. Normal mode
-returns 404 for this endpoint and still requires manually provisioned credentials.
-
-All local fixture viewers share that demo identity and its history. This is demo
-convenience, not user isolation between local viewers or production authentication.
-Disconnect clears browser state; reload signs in again. Existing audits belonging
-to other provisioned users stay private. API restarts issue a new credential;
-previous token hashes follow the existing no-expiry demo token behavior.
+`npm run benchmark:results` uses synthetic data and an in-memory database.
+Timing and sampled heap growth are diagnostics, not production SLOs or peak-memory
+claims. See [query trade-offs](DECISIONS.md#database-backed-pagination) before
+increasing engine limits. Run `npm run check:all` after code changes.

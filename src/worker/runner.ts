@@ -1,3 +1,4 @@
+// Claim leased jobs, run audits, and publish results with stale-worker protection.
 import { setTimeout as sleep } from 'node:timers/promises';
 import { runAudit } from '../application/audit/index.js';
 import type { AuditOptions } from '../application/audit/types.js';

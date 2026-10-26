@@ -1,3 +1,4 @@
+// Test inventory projection, summaries, and CSV safety.
 import { summarizeAudit } from '../../src/shared/summary.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,3 +1,4 @@
+// Write structured worker events without tokens or target URLs.
 export interface AuditLogEvent {
   event:
     | 'worker_started'

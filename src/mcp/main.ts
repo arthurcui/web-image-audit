@@ -1,3 +1,4 @@
+// Start the authenticated stdio MCP server without logging to protocol stdout.
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { readConfig } from '../config.js';
 import { SqliteJobStore } from '../infrastructure/sqlite/job-store.js';

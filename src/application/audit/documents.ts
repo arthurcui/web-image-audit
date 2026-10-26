@@ -1,3 +1,4 @@
+// Traverse bounded page and iframe documents and collect their image candidates.
 import { CoverageFindings } from './coverage.js';
 import { toFetchMetadata } from './metadata.js';
 import { loadBuffer } from 'cheerio';

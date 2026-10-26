@@ -1,3 +1,4 @@
+// Test health response validation.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isHealthResponse } from '../../src/shared/health.js';

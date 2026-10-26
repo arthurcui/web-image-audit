@@ -1,3 +1,4 @@
+// Validate scan input and submit audits with retry-safe idempotency keys.
 import { createAuditSchema } from '../shared/inputs.js';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';

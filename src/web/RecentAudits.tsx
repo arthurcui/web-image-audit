@@ -1,3 +1,4 @@
+// Display owned audits with cursor history and active-job refresh.
 type AuditCursor = string;
 import { useCallback, useState } from 'react';
 import type { AuditJob } from '../shared/jobs.js';

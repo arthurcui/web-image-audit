@@ -1,3 +1,4 @@
+// Serve deterministic HTML and image cases for the local audit demonstration.
 import { createServer } from 'node:http';
 import { fixtureImage } from './fixture-images.js';
 const images = {

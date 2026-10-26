@@ -1,3 +1,4 @@
+// Translate demo commands into MCP bridge calls and display tool responses.
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { demoHelp, parseDemoCommand } from './demo-command.js';
