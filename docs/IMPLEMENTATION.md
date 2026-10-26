@@ -16,7 +16,7 @@ setup in [README](../README.md), and recovery in [operations](OPERATIONS.md).
 - [x] **Persistence:** normalized result tables, cached summaries, indexed pages,
   atomic publication, migrations, streaming exports, and readiness probes.
 - [x] **Demo:** isolated local fixture, automatic fixture sign-in, illustrations,
-  and a revised script awaiting recording.
+  and a recorded product-focused walkthrough with neural narration and captions.
 - [x] **Maintainability:** shared schemas, enforced layer boundaries, file-purpose
   comments, subsystem tests, OpenAPI, ERD, and installation/test/build CI.
 

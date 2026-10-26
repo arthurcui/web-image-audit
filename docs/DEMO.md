@@ -1,6 +1,7 @@
-# Five-minute demo script
+# Demo outline
 
-**Draft for review. Do not record yet.** The linked video is the earlier demo.
+Watch the [recorded demo](https://youtu.be/O9vKUJqQCI4) for a walkthrough of the
+audit workflow, findings, and design highlights.
 
 ## Prepare
 
