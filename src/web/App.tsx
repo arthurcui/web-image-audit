@@ -1,3 +1,4 @@
+// Compose connection state, audit workflows, and the scripted MCP demonstration.
 import { useEffect, useState } from 'react';
 import { ConnectionForm } from './ConnectionForm.js';
 import { AuditForm } from './AuditForm.js';

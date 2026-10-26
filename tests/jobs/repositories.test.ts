@@ -1,3 +1,4 @@
+// Test separation of owner and privileged repository access.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SqliteJobStore } from '../../src/infrastructure/sqlite/job-store.js';

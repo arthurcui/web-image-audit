@@ -1,3 +1,4 @@
+// Test HTTP health and readiness behavior.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildApp } from '../../src/api/app.js';

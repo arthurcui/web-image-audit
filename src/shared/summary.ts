@@ -1,3 +1,4 @@
+// Count audit outcomes without implying candidate visibility.
 import type { AuditResult } from './audit.js';
 /** Counts describe candidates and inspection outcomes, not actual browser visibility. */
 export function summarizeAudit(result: AuditResult) {

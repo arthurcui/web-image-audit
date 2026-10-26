@@ -1,3 +1,4 @@
+// Assert repository privilege boundaries at compile time.
 import type { AuditRepository, WorkerQueue } from '../../src/application/jobs.js';
 import type { TokenRepository } from '../../src/application/auth.js';
 

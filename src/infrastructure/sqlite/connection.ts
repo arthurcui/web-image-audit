@@ -1,3 +1,4 @@
+// Open SQLite with persistence settings and apply schema migrations.
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

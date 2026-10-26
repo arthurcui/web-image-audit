@@ -1,3 +1,4 @@
+// Configure serial browser workflow tests and their local servers.
 import { browserExecutable } from './src/application/audit/adapters/browser-config.js';
 import { defineConfig } from '@playwright/test';
 export default defineConfig({

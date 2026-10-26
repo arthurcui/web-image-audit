@@ -1,3 +1,4 @@
+// Resolve normal or isolated fixture configuration and approved hosts.
 import { resolve } from 'node:path';
 import { createUrlPolicy } from './application/audit/policy.js';
 

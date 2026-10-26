@@ -1,3 +1,4 @@
+// Apply SQLite migrations to the configured database.
 import { readConfig } from '../config.js';
 import { SqliteJobStore } from '../infrastructure/sqlite/job-store.js';
 

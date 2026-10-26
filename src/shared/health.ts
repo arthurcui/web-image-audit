@@ -1,3 +1,4 @@
+// Define and validate public liveness and readiness response contracts.
 export interface HealthResponse {
   status: 'ok';
   service: 'website-image-audit';

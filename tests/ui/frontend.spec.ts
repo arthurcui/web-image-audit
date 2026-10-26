@@ -1,3 +1,4 @@
+// Test browser submission, results, connection, and pagination workflows.
 import { summarizeAudit } from '../../src/shared/summary.js';
 import type { AuditResult } from '../../src/shared/audit.js';
 import { test, expect } from '@playwright/test';

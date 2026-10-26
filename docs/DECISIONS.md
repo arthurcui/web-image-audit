@@ -10,7 +10,7 @@ managed backups and availability, but adds credentials, service cost and operati
 
 ## Database schema
 
-Migration 6 implements normalized result storage. Sources:
+Normalized result storage separates files from their HTML uses. Sources:
 [migrations.ts](../src/infrastructure/sqlite/migrations.ts) and
 [results.ts](../src/infrastructure/sqlite/results.ts).
 
@@ -161,29 +161,21 @@ Graceful shutdown stops claiming and drains the current bounded audit.
 
 ## Shared REST and MCP services
 
-Decision: both transports call AuditService for identity/ownership and idempotency.
-Routes and MCP schemas validate transport shapes; neither accepts a caller user ID
-as proof of identity. The worker queue is a trusted internal boundary.
-Trade-off: transports still have separate DTOs; MCP deliberately truncates/paginates
-large results. The UI's scripted bridge launches short-lived stdio processes for
-clarity, accepting startup overhead. It is not a remote MCP/OAuth transport.
+AuditService centralizes ownership and idempotency; shared schemas validate inputs
+and public DTOs exclude lease/owner internals. Transport adapters map application
+errors and apply their own response bounds. Dependency rules enforce layer imports.
 
 ### Persistence interfaces
 
-Persistence uses three narrow interfaces over one SqliteJobStore implementation:
+One SQLite implementation supplies three narrow capabilities:
 
-- AuditRepository: creation and reads require an explicit owner ID. AuditService
-  obtains that ID from authentication; callers cannot supply it as proof of identity.
-  Missing/blank ownership is rejected at runtime and SQL always filters owner_id.
-- WorkerQueue: privileged cross-owner claims and lease-fenced heartbeat, progress,
-  completion and failure operations. Only the trusted worker receives this interface;
-  it has no arbitrary audit reads or token methods.
-- TokenRepository: hash storage and token-to-user lookup for authentication and
-  local provisioning, with no audit or queue operations.
+- **AuditRepository:** owner-required creation/reads; identity comes from authentication.
+- **WorkerQueue:** trusted cross-owner claims and lease-fenced writes, without token methods.
+- **TokenRepository:** token hashes and user lookup, without audit/queue operations.
 
-These are TypeScript capability boundaries, not a sandbox for malicious in-process
-code. API and MCP continue to authenticate through AuditService. The SQLite class
-implements all three so connection handling and transactions remain centralized.
+This reduces accidental privilege use; TypeScript interfaces are not an in-process
+security sandbox. The scripted MCP bridge trades process-startup overhead for
+short-lived sessions. Remote OAuth is outside this local demonstration.
 
 ## Static parsing and optional browser rendering
 
@@ -192,8 +184,6 @@ and bounded crawls/iframe inspection cover some JavaScript-created content.
 All external fetches retain exact-host approval and redirect/byte/deadline controls.
 Trade-off: rendering adds browser installation, execution risk and more dependencies;
 timed snapshots and isolated frames are not faithful full interactive sessions.
-The project-local browser manifest makes the runtime visible to the same worker
-that consumes jobs. Browser downloads and runtime manifests are not repository data.
 Neither discovery strategy establishes visibility or accessibility compliance.
 
 ## Database-backed pagination
@@ -213,9 +203,9 @@ limits only after profiling these joins/counts.
 
 The engine still assembles one bounded result in memory before publication. SQL
 rows/metadata are prepared outside the write transaction, then atomically published
-with the summary and terminal state under the lease fence. Migration 6 preserves
-older JSON snapshots and version-5 rows in a transaction; it holds a write lock and
-needs temporary disk space. Exports read batches and yield without holding locks.
+with the summary and terminal state under the lease fence. Exports honor
+backpressure and yield between batches without holding transactions.
+[Upgrade procedures](OPERATIONS.md#database-and-upgrades) cover migration risks.
 
 Use `npm run benchmark:results` for repeatable local diagnostics. Timing and sampled
 heap allocation are not production SLOs or peak-memory guarantees. Tests assert

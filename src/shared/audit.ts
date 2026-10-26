@@ -1,3 +1,4 @@
+// Define browser-safe audit resources, occurrences, candidates, and coverage contracts.
 import type { ScanOptions } from './scan.js';
 
 export type FailureCode =

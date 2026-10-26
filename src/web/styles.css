@@ -1,3 +1,4 @@
+/* Style the responsive audit interface and accessible control states. */
 :root{font-family:Inter,'Segoe UI',sans-serif;color:#172d29;background:#f3f3ec;font-synthesis:none;font-size:15px;line-height:1.6}
 *{box-sizing:border-box}body{margin:0}main{max-width:1500px;margin:auto;padding:28px 40px 48px}
 header,.actions,.section-heading,.input-row{display:flex;align-items:center;gap:12px}header{justify-content:space-between;border-bottom:1px solid #cdd3c9;padding-bottom:20px}

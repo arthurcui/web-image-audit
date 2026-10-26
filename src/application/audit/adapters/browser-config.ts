@@ -1,3 +1,4 @@
+// Resolve the Chromium executable from project installation or configuration.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 

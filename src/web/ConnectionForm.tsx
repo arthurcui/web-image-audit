@@ -1,3 +1,4 @@
+// Connect using an in-memory token or the isolated fixture session.
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { AuditJob } from '../shared/jobs.js';

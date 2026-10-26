@@ -1,3 +1,4 @@
+// Project internal job records into explicit public response fields.
 import type { AuditJob as PublicAuditJob } from '../shared/jobs.js';
 import type { AuditJob } from './jobs.js';
 /** Explicit allowlist: adding a persistence field never expands the public response. */

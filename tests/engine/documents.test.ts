@@ -1,3 +1,4 @@
+// Test rendered pages, crawling, and iframe inspection.
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

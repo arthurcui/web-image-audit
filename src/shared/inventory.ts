@@ -1,3 +1,4 @@
+// Build image inventory rows and formula-safe CSV representations.
 import type { AuditResult, Candidate, Occurrence, Resource } from './audit.js';
 
 export interface InventoryRow {

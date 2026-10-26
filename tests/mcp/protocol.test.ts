@@ -1,3 +1,4 @@
+// Test MCP tool behavior through a real protocol client.
 import test from 'node:test';
 import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';

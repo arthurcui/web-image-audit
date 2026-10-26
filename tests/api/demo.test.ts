@@ -1,3 +1,4 @@
+// Test isolated fixture behavior and demo session access.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createFixtureServer } from '../../src/demo/fixture.js';

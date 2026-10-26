@@ -1,3 +1,4 @@
+// Expose inventory helpers and browser file-download behavior.
 export * from '../shared/inventory.js';
 export function download(name: string, text: string, type: string) {
   const url = URL.createObjectURL(new Blob([text], { type }));

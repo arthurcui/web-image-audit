@@ -1,3 +1,4 @@
+// Parse the supported scripted demo commands into MCP tool requests.
 export type DemoCall =
   | { name: 'start_audit'; arguments: { url: string; idempotencyKey: string } }
   | { name: 'get_audit_status'; arguments: { id: string } }

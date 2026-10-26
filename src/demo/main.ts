@@ -1,3 +1,4 @@
+// Start the labeled fixture server on its loopback port.
 import { createFixtureServer } from './fixture.js';
 const server = createFixtureServer();
 server.listen(3105, '127.0.0.1', () =>

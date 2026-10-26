@@ -1,3 +1,4 @@
+// Present summary, coverage, filtered image pages, and export controls.
 import type { InventoryPage } from '../shared/result-query.js';
 import { requestAuditApi } from './client.js';
 import { summarizeAudit } from '../shared/summary.js';

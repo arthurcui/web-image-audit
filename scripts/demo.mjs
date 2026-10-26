@@ -1,3 +1,4 @@
+// Launch isolated fixture-mode processes or standalone demo commands.
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';

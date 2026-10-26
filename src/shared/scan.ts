@@ -1,3 +1,4 @@
+// Validate scan modes and bounded document traversal options.
 import * as z from 'zod/v4';
 export const scanSchema = z.strictObject({
   mode: z.enum(['static', 'rendered', 'crawl']).default('static'),

@@ -1,3 +1,4 @@
+// Test the browser-to-MCP audit workflow.
 import { test, expect } from '@playwright/test';
 import { fixtureToken, fixtureUrl } from './fixture.js';
 

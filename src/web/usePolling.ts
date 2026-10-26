@@ -1,3 +1,4 @@
+// Poll active work while avoiding overlapping requests and stale updates.
 import { useEffect, useState } from 'react';
 
 /** One request at a time; terminal snapshots and failures require no timer. */

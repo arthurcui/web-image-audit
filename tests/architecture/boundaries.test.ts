@@ -1,3 +1,4 @@
+// Test enforcement of source-layer dependency boundaries.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';

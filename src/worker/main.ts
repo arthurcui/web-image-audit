@@ -1,3 +1,4 @@
+// Start the persistent worker and coordinate presence and shutdown.
 import { startWorkerPresence } from './presence.js';
 import { writeAuditLog } from './log.js';
 import { readConfig } from '../config.js';

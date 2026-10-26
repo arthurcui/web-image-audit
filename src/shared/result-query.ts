@@ -1,3 +1,4 @@
+// Define result sections, filters, and paginated result contracts.
 import * as z from 'zod/v4';
 import type { AuditResult, Candidate, Occurrence, Resource } from './audit.js';
 import type { summarizeAudit } from './summary.js';

@@ -1,3 +1,4 @@
+// Configure the React dev server, loopback binding, and API proxy.
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 

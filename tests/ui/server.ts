@@ -1,3 +1,4 @@
+// Start disposable API, worker, and fixture processes for browser tests.
 import { createServer as createHttpServer } from 'node:http';
 import { fork } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';

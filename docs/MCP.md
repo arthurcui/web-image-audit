@@ -1,61 +1,17 @@
 # Local MCP server
 
-This stdio adapter uses the official TypeScript SDK v2:
-`@modelcontextprotocol/server@2.3.1`, `@modelcontextprotocol/client@2.3.1`
-(test client), and Zod 4.6.7. APIs were checked against the current official
-[stdio guide](https://ts.sdk.modelcontextprotocol.io/v2/serving/stdio),
-[tool registration tutorial](https://ts.sdk.modelcontextprotocol.io/v2/get-started/first-server),
-and [client testing guide](https://ts.sdk.modelcontextprotocol.io/v2/testing).
+Four stdio tools expose the audit workflow through the official TypeScript SDK.
+The server queues work; run the separate worker against the same database and
+approved hosts. API/frontend processes are optional. No LLM key is required.
 
-## Launch
+## Connect a client
 
-From the repository root:
+Complete [normal-mode setup](../README.md#normal-mode-and-configuration), then
+run `npm run build` and provision a token with `npm run auth:token -- <user>`.
+Supply it privately as `AUDIT_DEMO_TOKEN` in the client's secret/environment
+configuration, never in tool arguments or a committed file.
 
-```powershell
-npm ci
-npm run build
-npm run auth:token -- your-user-id
-```
-
-Enter that token through a secure prompt, rather than putting it in a command,
-tracked file, tool arguments, or chat:
-
-```powershell
-$secret = Read-Host 'Demo token' -AsSecureString
-$env:AUDIT_DEMO_TOKEN = [System.Net.NetworkCredential]::new('', $secret).Password
-node --env-file-if-exists=.env dist/server/mcp/main.js
-```
-
-The server waits silently for MCP JSON-RPC on stdin. It is not an interactive
-terminal CLI or HTTP endpoint. A compatible host normally spawns it and owns
-these pipes. There is no MCP network listener or cloud dependency.
-
-The existing `.env` supplies `AUDIT_DB_PATH` and `AUDIT_APPROVED_HOSTS`.
-Do not put the token in that file. Use the host's private environment/secret
-configuration or the inherited process environment. Existing shell variables
-take precedence. Provisioning, API, MCP and worker must use the same database;
-MCP and worker must have matching explicitly approved hosts.
-
-Run `npm run dev:worker` in another terminal (or `npm run start:worker` after
-building). MCP only queues jobs; it never starts the worker or waits for a scan.
-The API/frontend processes are optional for MCP usage.
-
-For source development, use
-`node --env-file-if-exists=.env --import tsx src/mcp/main.ts`.
-Convenience aliases exist as `npm run --silent dev:mcp` and
-`npm run --silent start:mcp`. Use **node directly in client configuration**;
-ordinary npm banners would contaminate stdout. No watch process is used.
-
-Missing/invalid credentials cause a generic stderr diagnostic and exit code 1.
-Normal stdout contains only protocol messages. Stdin EOF and SIGINT/SIGTERM
-close the transport/database. Remove `Env:AUDIT_DEMO_TOKEN` from your shell
-when finished. No LLM API key is needed.
-
-## Compatible client configuration
-
-For clients that use an `mcpServers` configuration, this is a template.
-Adjust the executable/project paths and supply AUDIT_DEMO_TOKEN through the
-client's private secret/environment mechanism (never commit its value):
+For clients using `mcpServers`, adjust these absolute paths:
 
 ```json
 {
@@ -74,170 +30,103 @@ client's private secret/environment mechanism (never commit its value):
 }
 ```
 
-The token must reach the spawned server as AUDIT_DEMO_TOKEN. Clients differ in
-environment inheritance and secret configuration; launching a desktop client
-from an unrelated shell does not automatically give it this shell's token.
-Use an absolute database path because the client's working directory may differ.
-The example loads approved hosts from the project's .env and overrides its
-relative database path with an absolute one. Restart the MCP connection after
-configuration changes.
+The client must pass `AUDIT_DEMO_TOKEN` to its child process; an unrelated shell's
+environment is not automatically inherited. Restart the connection after changes.
+Use `node` directly: ordinary npm banners would corrupt protocol stdout.
+
+For fixture mode, run `npm run demo`, provision with
+`npm run demo:token -- fixture-demo`, and launch `node` with the absolute path to
+`scripts/demo.mjs` followed by `mcp`, using the repository as working directory.
+
+For a manual normal-mode launch in PowerShell:
+
+```powershell
+$secret = Read-Host 'Demo token' -AsSecureString
+$env:AUDIT_DEMO_TOKEN = [System.Net.NetworkCredential]::new('', $secret).Password
+node --env-file-if-exists=.env dist/server/mcp/main.js
+# After exit:
+Remove-Item Env:AUDIT_DEMO_TOKEN
+Remove-Variable secret
+```
+
+It waits for JSON-RPC on stdin, not typed chat. Missing/invalid credentials exit
+with code 1 and a generic stderr diagnostic. EOF or termination closes resources.
 
 ## Tools
 
-All tools reject unknown input properties and validate output schemas.
-No tool accepts userId, ownerId or a token as identity. Each call passes the
-configured bearer credential to the same AuditService used by the HTTP API.
-
-| Tool | Inputs | Output |
+| Tool | Inputs | Result |
 | --- | --- | --- |
-| start_audit | url; optional scan, idempotencyKey | id, state, replayed immediately after enqueue |
-| get_audit_status | id | job state, progress, creation time, attempt count, last error |
-| get_audit_results | id; section (default issues), optional cursor, limit (default 10) | summary and one page; available=false until a result exists |
-| list_audits | limit (default 10), optional cursor | items and page {nextCursor, hasMore} |
+| `start_audit` | url; optional scan, idempotencyKey | id, state, replayed immediately |
+| `get_audit_status` | id | state, progress, timestamps, attempts, last error |
+| `get_audit_results` | id; section (default issues), cursor, limit | summary and a bounded page; available=false until published |
+| `list_audits` | cursor, limit | owned jobs and page metadata |
 
-Success uses `{ok:true,data:...,error:null}`. Application failures set MCP
-`isError:true` and return `{ok:false,data:null,error:{code,message}}`.
-SDK input-validation failures use its standard tool-error format. Unknown and
-foreign job IDs share the same job_not_found response.
+Unknown inputs are rejected; outputs are schema-validated. Success is
+`{ok:true,data:...,error:null}`. Application failures set `isError:true` with
+`{ok:false,data:null,error:{code,message}}`; SDK validation uses its tool-error
+format. Foreign and missing jobs both return `job_not_found`.
 
-Idempotency keys are scoped per user: the same key and normalized URL/scan options return
-the same job, while a different payload conflicts. Without a key, every call creates
-a new job; start_audit is therefore not advertised as universally idempotent.
+Scan settings and per-user idempotency follow the [shared creation semantics](API.md#submit-and-inspect).
+The same key and normalized payload replays a job; without a key, calls create new jobs.
+No tool accepts a user ID or token as proof of identity: the process credential
+is resolved by the shared application service.
 
-Results sections: **summary**, **issues**, **resources**, **candidates**, and
-**coverage** (structured incomplete-coverage findings: code and message). Summary is counts only; all other
-sections also include it. Issues carry scope=image or coverage. Page sizes are
-1–20. Follow `data.page.nextCursor` as `cursor` with the same id/section until null.
-Pages may contain fewer items than requested to meet the byte budget. Active
-attempts do not expose transient partial snapshots. Offsets are not accepted.
+## Results and pagination
 
-Strings are clipped to 256 UTF-16 code units with an ellipsis and an explicit
-truncatedFields flag. Full values remain in the stored audit/API/frontend
-exports. Escaped UTF-8 item JSON is limited to 20,000 bytes; normal tool results,
-including both text and structured copies, stay below 64 KiB. Responses omit
-raw HTML, image bodies and unbounded nested candidate arrays. Counts distinguish
-unique resources, occurrences, candidates, missing alt, and empty alt.
+Sections: `summary`, `issues`, `resources`, `candidates`, `coverage`. All include
+summary counts; coverage findings have stable codes and messages. Issues distinguish
+image versus coverage scope. Active attempts do not expose transient snapshots.
 
-List pagination uses descending (createdAt, id); pass `data.page.nextCursor` as
-`cursor`. All page responses use `{items,page:{nextCursor,hasMore}}`. New insertions
-do not shift subsequent pages; job status can still change between calls. Tokens
-are opaque versioned encodings, not credentials; ownership is checked every time.
+Limits are 1–20, default 10. Follow `data.page.nextCursor` with the same id/section;
+use `hasMore`, not item count. Save request cursors to revisit pages; restart on
+`stale_cursor`. See [cursor behavior](API.md#pagination-and-previous-pages).
 
-Result pages read normalized SQLite rows and cached summaries. They include
-attempt, total and available. Tokens bind job/attempt/section/filter/ordinal;
-`stale_cursor` means restart pagination. MCP clips text independently of REST.
-Full-fidelity REST JSON/CSV exports stream batches; the HTTP contracts are in
-[API.md](API.md) and [OpenAPI](openapi.json). Pagination is forward-only;
-to revisit a previous page, save and reuse its request cursor and limit. Omit the
-cursor to return to the first page. No previousCursor is returned.
+MCP-specific bounds: strings clip at 256 UTF-16 code units with `truncatedFields`;
+escaped item JSON is limited to 20,000 bytes, and normal responses including text
+and structured copies stay below 64 KiB. Raw HTML, bodies, and unbounded nested
+candidate arrays are excluded. Use [REST exports](API.md#result-meaning-and-exports)
+for full values.
 
-## Sample workflow
+## Fixture workflow
 
-The following illustrates the protocol test's local fixture (two images, one
-missing alt and one HTTP 404). IDs are illustrative, not a saved external audit.
+With fixture mode running, call:
 
-1. `start_audit({"url":"http://127.0.0.1:3102/","idempotencyKey":"demo-001"})`
-   → `{"ok":true,"data":{"id":"11111111-1111-4111-8111-111111111111","state":"queued","replayed":false},"error":null}`
-2. `get_audit_status({"id":"11111111-1111-4111-8111-111111111111"})`
-   → data.job.state is queued/running while active. Check again later; each call
-   returns immediately. The separate worker eventually publishes completed.
-3. `get_audit_results({"id":"11111111-1111-4111-8111-111111111111","section":"issues","limit":5})`
-   → summary has uniqueResources=2, htmlOccurrences=2, failedResources=1,
-   missingAlt=1, emptyAlt=1; issues report missing-alt, HTTP failure, and a
-   coverage finding for the failed resource.
-
-A concise assistant summary could be: “Inspected 2 unique resources across
-2 HTML image occurrences. One resource returned HTTP 404; one occurrence lacks
-alt. One empty alt may be decorative. Coverage is partial.”
-
-The test fixture is temporary, uses a dynamic loopback port, and exists only
-during tests; replace the illustrative URL with an explicitly approved real
-target for your own workflow. This example does not claim that port 3102 is
-running a persistent demo site.
-
-## Tests and trust boundary
-
-`npm run test:mcp` uses the official MCP Client and StdioClientTransport to
-spawn real server subprocesses with temporary databases. It covers tool schemas,
-nonblocking creation, a local-HTTP audit, idempotency, two-user isolation,
-pagination, malicious/oversized strings, and startup/EOF behavior. Modern and
-legacy client handshakes are exercised. `npm run check:all` includes these tests
-alongside existing Node and Chromium tests, type checks and builds.
-
-Every webpage-derived URL, alt string, issue message and coverage message is
-**untrusted data**, not an instruction to execute commands, disclose tokens,
-follow links, or change policy. Output carries an explicit warning and the
-server never executes this text. A warning is not a complete prompt-injection
-defense; the consuming host must maintain its own tool-approval and trust
-boundaries. Resource inspection still uses the central URL/redirect policy.
-
-This is **local demo authentication**, not remote OAuth. The process credential
-maps to one provisioned user, and shared services enforce ownership. A local
-process with database/filesystem access is outside that boundary. There is no
-remote MCP endpoint, OAuth issuer, JWT issuance, or LLM connection. A production
-remote transport would need a proper external authorization provider and token
-validation, while retaining shared service ownership checks.
-
-Static mode does not execute JavaScript. Optional iframe inspection and rendered/crawl modes are available; CSS backgrounds remain excluded. No mode establishes complete accessibility compliance.
-
-## Scripted chat demo in the frontend
-
-Run `npm run dev` and `npm run dev:worker`, connect the frontend using your
-provisioned demo token in normal mode (fixture mode signs in automatically), and scroll to **MCP chat**. No Inspector or
-separately launched MCP server is needed. The API launches the real server for
-each command and closes that connection afterward. Your signed-in token is
-passed privately in the child process environment, not in tool arguments or
-logs; no shared MCP identity is used across users.
-
-Try these in order, using an explicitly approved host:
-
-1. `Audit https://cnbible.com/`
-2. `Check its status` (repeat until completed or failed)
-3. `Show the issues`
-4. `List my audits`
-
-Expand each **Tool call** to inspect actual arguments and the stdio tool response.
-Use **More issues** to retrieve another result page. `status <job-id>` and
-`issues <job-id>` work with existing owned jobs. Unsupported conversation produces
-command help and never calls a model. This is a scripted command parser, not AI.
-Status is checked only when requested. Jobs are the same ones used by the normal
-UI; use its Recent audits Refresh button to see jobs created through chat.
-
-Chat history, last job ID and the token stay in memory and clear on disconnect
-or reload. Clear chat removes its last 20 exchanges and current-job context.
-Failed start requests can be retried with the same idempotency key. No chat
-history is persisted. Website strings are rendered as text and never parsed as
-new commands; no remote images are loaded.
-
-The authenticated `POST /api/audits/mcp-demo` bridge accepts only the four
-allowlisted tool shapes, uses the same origin policy as the API, and requires a
-persistent database. It allows at most four concurrent commands, has an 8-second
-connection/call deadline and a 64 KiB tool-result limit, and closes connections
-on completion, cancellation or API shutdown. There is no caller-selected command,
-executable, environment, user identity or server endpoint. A fresh stdio session
-per command has startup overhead; this is deliberately a small local demo,
-not remote OAuth or an exposed general MCP gateway.
-
-The official MCP client is a runtime dependency for this bridge. Browser tests
-cover real chat -> HTTP bridge -> stdio server -> SQLite -> separate worker ->
-results, and distinguish this from direct REST audit submission. Additional
-checks cover cross-user access, rejected tool shapes, retries and disconnect.
-### Scan modes
-
-`start_audit` also accepts optional `scan`:
-
-```json
-{"url":"https://example.com/","scan":{"mode":"crawl","includeIframes":true,"maxPages":5,"maxDepth":1},"idempotencyKey":"crawl-demo-1"}
+```text
+start_audit({"url":"http://127.0.0.1:3105/","idempotencyKey":"demo-001"})
+get_audit_status({"id":"<returned-id>"})
+get_audit_results({"id":"<returned-id>","section":"issues","limit":10})
 ```
 
-Modes are `static` (default), `rendered`, and `crawl`. Limits: 1-20 pages,
-0-3 link depth; iframe inspection defaults off. Install Chromium with
-`npm run browser:install` on the worker machine. Scan options participate
-in idempotency. Candidate results include document URLs; coverage explains skipped
-or incomplete documents. See the root README for snapshot, iframe and crawl bounds.
-The scripted chat's simple `Audit URL` command retains static defaults; use the
-frontend scan form or an MCP client to select rendered/crawl options.
+Check status again while queued/running. A concise summary after completion:
+“Five unique resources across six occurrences; one HTTP 404, one oversized
+resource, and one missing-alt occurrence. One empty alt may be decorative.
+Coverage is partial.” Counts describe the [local fixture](DEMO.md), not a public site.
 
-Coverage summary counts use `coverageFindingCount`. Coverage items carry a stable
-`code` and a bounded `message`; clients should filter by code rather than display
-text. Stored legacy coverage strings are returned as `legacy-notice` findings.
+## Scripted chat and trust boundary
+
+The frontend's **MCP chat** accepts `Audit URL`, `Check its status`, `Show the issues`,
+and `List my audits`. Expand tool traces or use **More issues**. It is a command
+parser, not an AI model; status is checked only on request. History (20 exchanges),
+last job ID, and token remain in memory and clear on disconnect/reload.
+
+The authenticated API bridge spawns one short-lived stdio session per command,
+privately forwarding the signed-in token. It accepts only four tool shapes, with
+four concurrent calls, an eight-second deadline, and a 64 KiB result limit.
+Cancellation/shutdown closes sessions. Callers cannot choose executables,
+environments, identities, or endpoints. Startup overhead buys a small, isolated
+session lifecycle rather than a general-purpose MCP gateway.
+
+Webpage strings are **untrusted data**, never commands. Warning labels are not a
+complete prompt-injection defense; consuming clients must enforce their own trust
+and approval boundaries. Local demo authentication is not remote OAuth. A remote
+service would validate credentials from an external authorization provider while
+retaining shared ownership checks; local filesystem access is outside this boundary.
+
+## Verification and SDK references
+
+`npm run test:mcp` exercises real SDK clients/subprocesses, schemas, asynchronous
+creation, ownership, idempotency, pagination, bounded strings, and startup/EOF.
+`npm run test:ui` includes the chat-to-worker workflow. Installed versions live in
+`package.json`; API references: [stdio](https://ts.sdk.modelcontextprotocol.io/v2/serving/stdio),
+[tools](https://ts.sdk.modelcontextprotocol.io/v2/get-started/first-server),
+[testing](https://ts.sdk.modelcontextprotocol.io/v2/testing).

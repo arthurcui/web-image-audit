@@ -1,3 +1,4 @@
+// Test scripted chat command parsing.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseDemoCommand } from '../../src/web/demo-command.js';

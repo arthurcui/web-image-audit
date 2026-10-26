@@ -1,3 +1,4 @@
+// Capture rendered HTML with bounded browser requests and URL-policy enforcement.
 import { CoverageFindings } from '../coverage.js';
 import { browserExecutable } from './browser-config.js';
 import { chromium } from 'playwright';

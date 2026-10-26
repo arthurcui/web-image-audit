@@ -1,3 +1,4 @@
+// Maintain the worker heartbeat used by readiness probes.
 import { randomUUID } from 'node:crypto';
 import { workerHeartbeatIntervalMs } from '../application/readiness.js';
 import type { ReadinessStore } from '../application/readiness.js';

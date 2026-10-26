@@ -1,3 +1,4 @@
+// Parse HTML image occurrences and responsive or lazy-loading candidates.
 import { CoverageFindings } from './coverage.js';
 import { loadBuffer } from 'cheerio';
 import type { Limits } from './types.js';

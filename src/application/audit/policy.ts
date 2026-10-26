@@ -1,3 +1,4 @@
+// Validate target URLs against the centralized scheme, credential, and host policy.
 export class PolicyError extends Error {
   constructor(
     public readonly code: 'policy' | 'invalid-url',

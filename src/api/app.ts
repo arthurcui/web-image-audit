@@ -1,3 +1,4 @@
+// Compose authenticated REST routes, readiness probes, exports, and the demo bridge.
 import { Readable } from 'node:stream';
 import { exportAudit } from '../application/export-audit.js';
 import * as z from 'zod/v4';

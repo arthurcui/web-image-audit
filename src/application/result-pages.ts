@@ -1,3 +1,4 @@
+// Validate and project bounded audit result pages shared by REST and MCP.
 import { pageInfoSchema } from '../shared/pagination.js';
 import { summarizeAudit } from '../shared/summary.js';
 import { coverageCodes } from '../shared/audit.js';

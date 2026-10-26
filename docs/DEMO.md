@@ -1,63 +1,75 @@
-# Five-minute demonstration
+# Five-minute demo script
 
-## Before the meeting (not part of the five minutes)
+**Draft for review. Do not record yet.** The linked video is the earlier demo.
 
-Run the README quick start, including browser installation.
-Stop normal app processes to free ports; run `npm run demo`. Confirm the frontend
-FIXTURE MODE banner and the labeled fixture at http://127.0.0.1:3105/.
-Open the frontend; fixture mode signs in automatically as the shared demo user.
-Run `npm run check:all` ahead of time. Keep worker logs visible in a second pane.
-Do not use a live public site for the core demo. No LLM key is needed.
+## Prepare
 
-## 0:00–0:40 — Problem and shape
+Run the [README quick start](../README.md#quick-start-deterministic-demo).
+Open the app at http://127.0.0.1:5173 and fixture at http://127.0.0.1:3105/.
+Confirm fixture mode and automatic sign-in. Use **Static page**, iframe inspection
+off. Rehearse and run `npm run check:all` before recording.
 
-“This is an image inventory and delivery audit, not an accessibility certification.
-One repository has REST, UI, worker and MCP entry points. SQLite persists the job;
-the request does not wait for network inspection.” Show the README diagram.
+## 0:00–0:45 — The problem
 
-## 0:40–1:40 — Submit and explain results
+**Show:** Scroll through the fixture's campsite, broken image, and coastal image.
 
-Submit http://127.0.0.1:3105/ as Static page, frames off. Wait for completed.
-Expected: 5 resources, 6 occurrences, 7 candidates. Point out the shared image
-with different alt attributes, sunset responsive fallback, wide daylight source,
-404 and large coastal SVG. Captions sit outside the images; cards provide spacing. Resize the fixture below/above 768 px to show the responsive switch; the oversized image displays at up to 1200 x 600.
-“One broken resource does not make the job fail; it makes coverage partial.”
+**Say:** “Before publishing, are your images broken, unnecessarily large, or
+missing text alternatives? Website Image Audit checks a URL and gives you a
+review list. This local example deliberately contains all three problems.”
 
-## 1:40–2:30 — Review without overclaiming
+## 0:45–1:30 — Scan the page
 
-Filter missing alt (one occurrence), then oversized (one resource), then failed
-(one 404). Empty alt is labeled possibly decorative. Show CSV/JSON export; explain
-CSV formula escaping and no automatic remote previews. Restore All candidates.
+**Show:** Narrow the fixture below 768 px, then widen it to show the responsive
+image switch. Submit `http://127.0.0.1:3105/` in the app; wait for completion.
 
-## 2:30–3:40 — MCP workflow
+**Say:** “Responsive pages can reference several versions of an image. The scan
+records candidates, not a claim that all were displayed. Here it finds five
+unique resources, six image occurrences, and seven candidate rows.”
 
-In MCP chat, type `Audit http://127.0.0.1:3105/`, then `Check its status`,
-then `Show the issues`. If queued/running, explicitly check again. Expand tool
-traces. “This is a scripted UI calling a real official-SDK stdio MCP client/server,
-not an LLM. The configured identity reaches the same ownership service.”
-Explain that start is asynchronous and results are bounded/paginated.
+## 1:30–3:00 — Review actionable findings
 
-## 3:40–4:25 — Failure and consistency model
+**Show:** Select **Failed resources**, **Oversized images**, then **Missing alt**.
+Pause on each finding. Return to **All candidates** and point out empty alt.
 
-Show audit IDs in structured worker logs. Explain atomic claims, heartbeats,
-expired-lease recovery and fencing stale writes. “Execution is at least once;
-only the current lease holder may publish. Idempotency is scoped per user.”
-Do not kill processes live: crash-recovery tests provide repeatable evidence.
+**Say:** “The 404 identifies a URL to correct or a file to restore. The coastal
+image exceeds the 500 KB threshold: a file to review for compression or resizing.
+Its size is deliberately padded for this demo; display dimensions alone do not
+make a file large. Missing alt identifies an image element needing a text
+alternative review. Empty alt may correctly mark decoration and is not an error.
+These checks guide fixes; they do not measure page speed or certify accessibility.”
 
-## 4:25–5:00 — Trade-offs and verification
+## 3:00–3:30 — Take the findings away
 
-Show architecture decisions and the test commands. Explain SQLite is intentional
-for a local demo; hosted databases and external queues add operational scope.
-Optional if time: rendered `/dynamic.html` with frames enabled discovers the
-JavaScript image and frame image. Be explicit about snapshot/parent-frame limits.
-Finish with what is verified and what would change before public hosting.
+**Show:** Download CSV and point to JSON export.
 
-## Recovery
+**Say:** “Export the inventory for follow-up, make changes to your website, then
+scan again. The app reports findings; it does not change the website for you.”
 
-If a port is occupied, stop the existing app before re-running demo. If automatic
-sign-in fails, check that the fixture API is running and select Connect to demo.
-Manual API/MCP clients can use `demo:token -- fixture-demo`; normal-mode tokens
-belong to a different database.
-If rendering cannot launch, run `browser:install`; the core static demonstration
-still works. Historical failed audits remain failed; submit a new job after repair.
-Never claim a public website or browser-dependent result has deterministic counts.
+## 3:30–4:15 — Use the same workflow through MCP
+
+**Show:** In MCP chat, enter `Audit http://127.0.0.1:3105/`, select **Check its
+status**, then **Show the issues**. Check again if still running; expand a trace.
+
+**Say:** “Compatible AI assistants can start an audit, check status, and retrieve
+findings through MCP. This chat demonstrates real tool calls with a simple
+command parser, not an AI model. No LLM key is needed.”
+
+## 4:15–5:00 — Design and direction
+
+**Show:** Briefly show the README architecture diagram, then return to results.
+
+**Say:** “The UI and MCP share services and ownership checks. SQLite persists
+jobs; a separate worker uses leases to recover abandoned work and reject stale
+writes. Current checks focus on broken images, file size, and alt attributes.
+I plan to add inspections incrementally toward near-complete coverage within a
+clearly defined scope. That is the roadmap, not today's claim. The value today
+is a concrete list of image issues to review before launch or after changes.”
+
+## Presenter notes
+
+- Expect one HTTP 404 resource, one oversized resource, one missing-alt occurrence,
+  and one empty-alt occurrence. The broken image makes coverage partial; the job completes.
+- Pause and scroll naturally. A quick scan may finish before running progress is visible.
+- Show pictures in the fixture tab; the app does not load remote image previews.
+- If setup fails, use [operations](OPERATIONS.md). Do not substitute a public site
+  and claim deterministic counts. Optional rendering/iframe demos are outside this script.

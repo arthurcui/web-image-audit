@@ -1,3 +1,4 @@
+// Send authenticated API requests and identify active audit states.
 import type { AuditJob } from '../shared/jobs.js';
 export type { ResultsResponse } from '../shared/jobs.js';
 

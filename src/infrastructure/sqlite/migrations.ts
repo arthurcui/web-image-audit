@@ -1,3 +1,4 @@
+// Define and apply versioned SQLite schema changes.
 import { normalizeResultTables } from './normalize-results.js';
 const resultTables = {
   resources: 'audit_resources',

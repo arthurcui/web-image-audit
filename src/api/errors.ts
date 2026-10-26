@@ -1,3 +1,4 @@
+// Map application error codes to HTTP status codes.
 import type { JobError } from '../application/jobs.js';
 /** Transport mapping; application errors deliberately have no HTTP status. */
 export const httpErrorStatus: Record<JobError['code'], number> = {

@@ -1,3 +1,4 @@
+// Start the loopback API with SQLite services and graceful shutdown.
 import { buildApp } from './app.js';
 import { readConfig } from '../config.js';
 import { SqliteJobStore } from '../infrastructure/sqlite/job-store.js';

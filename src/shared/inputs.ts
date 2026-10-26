@@ -1,3 +1,4 @@
+// Validate shared audit creation inputs, identifiers, and idempotency keys.
 import * as z from 'zod/v4';
 import { scanSchema } from './scan.js';
 export const auditUrlSchema = z
