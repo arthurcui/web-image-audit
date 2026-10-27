@@ -1,25 +1,21 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "lib": ["ES2023"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "types": [
-      "node"
-    ],
-    "lib": [
-      "ES2023"
-    ],
+    "outDir": "dist/server",
     "rootDir": "src",
-    "outDir": "dist/server"
+    "types": ["node"]
   },
   "include": [
     "src/api/**/*.ts",
     "src/application/**/*.ts",
-    "src/shared/**/*.ts",
-    "src/infrastructure/**/*.ts",
-    "src/worker/**/*.ts",
-    "src/mcp/**/*.ts",
+    "src/cli/**/*.ts",
     "src/demo/**/*.ts",
-    "src/cli/**/*.ts"
+    "src/infrastructure/**/*.ts",
+    "src/mcp/**/*.ts",
+    "src/shared/**/*.ts",
+    "src/worker/**/*.ts"
   ]
 }

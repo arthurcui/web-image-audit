@@ -1,28 +1,34 @@
+# Dependencies and build output
 node_modules/
 dist/
-coverage/
 *.tsbuildinfo
-*.log
+
+# Tests and coverage
+coverage/
+playwright-report/
+test-results/
+
+# Environment and secrets (keep the example exception after the wildcard)
 .env
 .env.*
 !.env.example
-data/
+.npmrc.local
+*.key
+*.pem
+secrets/
+
+# Local databases
 *.db
 *.db-*
 *.sqlite
 *.sqlite-*
 *.sqlite3
 *.sqlite3-*
+data/
 
-test-results/
-playwright-report/
-
-# Local secrets and downloaded/exported artifacts
-secrets/
-*.pem
-*.key
-.npmrc.local
+# Downloads, exports, and logs
+artifacts/
 downloads/
 exports/
-artifacts/
+*.log
 logs/

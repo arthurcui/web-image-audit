@@ -16,98 +16,6 @@
     }
   ],
   "paths": {
-    "/api/health": {
-      "get": {
-        "operationId": "health",
-        "summary": "Liveness only; does not check SQLite or the worker",
-        "description": "Liveness only; does not check SQLite or the worker.",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Health"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Disallowed browser Origin / CORS preflight",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Unexpected sanitized server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
-    "/api/ready": {
-      "get": {
-        "operationId": "readiness",
-        "summary": "Database access and worker-heartbeat readiness",
-        "description": "Database access and worker-heartbeat readiness. Does not verify Chromium installation or target-host reachability.",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Readiness"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Disallowed browser Origin / CORS preflight",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Unexpected sanitized server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Database unavailable or worker heartbeat missing/stale",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Readiness"
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
     "/api/audits": {
       "post": {
         "operationId": "startAudit",
@@ -343,6 +251,112 @@
         }
       }
     },
+    "/api/audits/mcp-demo": {
+      "post": {
+        "operationId": "mcpDemo",
+        "summary": "Execute one scripted demo command through an authenticated local stdio MCP client",
+        "description": "Execute one scripted demo command through an authenticated local stdio MCP client. Requires persistent database configuration. No caller-supplied identity; maximum four concurrent calls, eight-second deadline and 64 KiB result limit.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoReply"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, target, idempotency key or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string",
+                  "const": "Bearer"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Disallowed browser Origin / CORS preflight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body exceeds 8192 bytes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected sanitized server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database busy or MCP demo unavailable; database_busy includes Retry-After: 1",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Present for database_busy. Seconds to wait.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoCall"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audits/{id}": {
       "get": {
         "operationId": "auditStatus",
@@ -366,6 +380,272 @@
                 "schema": {
                   "$ref": "#/components/schemas/AuditStatus"
                 }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, target, idempotency key or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string",
+                  "const": "Bearer"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Disallowed browser Origin / CORS preflight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Audit not found (same response for another owner)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected sanitized server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database busy or MCP demo unavailable; database_busy includes Retry-After: 1",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Present for database_busy. Seconds to wait.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audits/{id}/documents": {
+      "get": {
+        "operationId": "documentsPage",
+        "summary": "Read a bounded page of documents",
+        "description": "Read a bounded page of documents. No published result returns available=false, attempt=null, items=[], total=0. Cursors bind the attempt and view; restart on stale_cursor. Item data targets 128 KiB, allowing one larger row for lossless output.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AuditId"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, target, idempotency key or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string",
+                  "const": "Bearer"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Disallowed browser Origin / CORS preflight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Audit not found (same response for another owner)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale attempt or mismatched result-view cursor; restart pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected sanitized server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database busy or MCP demo unavailable; database_busy includes Retry-After: 1",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Present for database_busy. Seconds to wait.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audits/{id}/export": {
+      "get": {
+        "operationId": "exportAudit",
+        "summary": "Stream the complete published audit",
+        "description": "Stream the complete published audit. format=json returns null if unavailable; format=csv returns a text notice. JSON includes full occurrences/candidates and separates image issues from coverage. CSV neutralizes spreadsheet formulas. A changed attempt or stream failure aborts the download; retry rather than using a partial file.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AuditId"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["json", "csv"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AuditExport"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "attachment; filename=\"audit-{id}.{format}\""
               }
             }
           },
@@ -484,12 +764,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": [
-                "all",
-                "failed",
-                "oversized",
-                "missing_alt"
-              ],
+              "enum": ["all", "failed", "oversized", "missing_alt"],
               "default": "all"
             },
             "description": "Applied before pagination. Cursor remembers the filter; omit it when following cursor. Start without cursor when changing filter."
@@ -502,270 +777,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ImagesPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request, target, idempotency key or cursor",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid bearer token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "headers": {
-              "WWW-Authenticate": {
-                "schema": {
-                  "type": "string",
-                  "const": "Bearer"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Disallowed browser Origin / CORS preflight",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Audit not found (same response for another owner)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Stale attempt or mismatched result-view cursor; restart pagination",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Unexpected sanitized server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Database busy or MCP demo unavailable; database_busy includes Retry-After: 1",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "headers": {
-              "Retry-After": {
-                "description": "Present for database_busy. Seconds to wait.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/audits/{id}/resources": {
-      "get": {
-        "operationId": "resourcesPage",
-        "summary": "Read a bounded page of resources",
-        "description": "Read a bounded page of resources. No published result returns available=false, attempt=null, items=[], total=0. Cursors bind the attempt and view; restart on stale_cursor. Item data targets 128 KiB, allowing one larger row for lossless output.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/AuditId"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/Cursor"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResourcesPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request, target, idempotency key or cursor",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid bearer token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "headers": {
-              "WWW-Authenticate": {
-                "schema": {
-                  "type": "string",
-                  "const": "Bearer"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Disallowed browser Origin / CORS preflight",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Audit not found (same response for another owner)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Stale attempt or mismatched result-view cursor; restart pagination",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Unexpected sanitized server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Database busy or MCP demo unavailable; database_busy includes Retry-After: 1",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "headers": {
-              "Retry-After": {
-                "description": "Present for database_busy. Seconds to wait.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/audits/{id}/documents": {
-      "get": {
-        "operationId": "documentsPage",
-        "summary": "Read a bounded page of documents",
-        "description": "Read a bounded page of documents. No published result returns available=false, attempt=null, items=[], total=0. Cursors bind the attempt and view; restart on stale_cursor. Item data targets 128 KiB, allowing one larger row for lossless output.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/AuditId"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/Cursor"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocumentsPage"
                 }
               }
             }
@@ -991,11 +1002,11 @@
         }
       }
     },
-    "/api/audits/{id}/export": {
+    "/api/audits/{id}/resources": {
       "get": {
-        "operationId": "exportAudit",
-        "summary": "Stream the complete published audit",
-        "description": "Stream the complete published audit. format=json returns null if unavailable; format=csv returns a text notice. JSON includes full occurrences/candidates and separates image issues from coverage. CSV neutralizes spreadsheet formulas. A changed attempt or stream failure aborts the download; retry rather than using a partial file.",
+        "operationId": "resourcesPage",
+        "summary": "Read a bounded page of resources",
+        "description": "Read a bounded page of resources. No published result returns available=false, attempt=null, items=[], total=0. Cursors bind the attempt and view; restart on stale_cursor. Item data targets 128 KiB, allowing one larger row for lossless output.",
         "parameters": [
           {
             "name": "id",
@@ -1006,15 +1017,20 @@
             }
           },
           {
-            "name": "format",
+            "name": "limit",
             "in": "query",
-            "required": true,
             "schema": {
-              "type": "string",
-              "enum": [
-                "json",
-                "csv"
-              ]
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Cursor"
             }
           }
         ],
@@ -1024,28 +1040,8 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/AuditExport"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/ResourcesPage"
                 }
-              },
-              "text/csv": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "headers": {
-              "Content-Disposition": {
-                "schema": {
-                  "type": "string"
-                },
-                "description": "attachment; filename=\"audit-{id}.{format}\""
               }
             }
           },
@@ -1097,94 +1093,8 @@
               }
             }
           },
-          "500": {
-            "description": "Unexpected sanitized server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Database busy or MCP demo unavailable; database_busy includes Retry-After: 1",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "headers": {
-              "Retry-After": {
-                "description": "Present for database_busy. Seconds to wait.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/audits/mcp-demo": {
-      "post": {
-        "operationId": "mcpDemo",
-        "summary": "Execute one scripted demo command through an authenticated local stdio MCP client",
-        "description": "Execute one scripted demo command through an authenticated local stdio MCP client. Requires persistent database configuration. No caller-supplied identity; maximum four concurrent calls, eight-second deadline and 64 KiB result limit.",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DemoReply"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request, target, idempotency key or cursor",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid bearer token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            },
-            "headers": {
-              "WWW-Authenticate": {
-                "schema": {
-                  "type": "string",
-                  "const": "Bearer"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Disallowed browser Origin / CORS preflight",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Request body exceeds 8192 bytes",
+          "409": {
+            "description": "Stale attempt or mismatched result-view cursor; restart pagination",
             "content": {
               "application/json": {
                 "schema": {
@@ -1218,16 +1128,6 @@
                 "schema": {
                   "type": "string"
                 }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DemoCall"
               }
             }
           }
@@ -1270,9 +1170,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": [
-                    "token"
-                  ],
+                  "required": ["token"],
                   "properties": {
                     "token": {
                       "type": "string",
@@ -1315,6 +1213,98 @@
           }
         }
       }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Liveness only; does not check SQLite or the worker",
+        "description": "Liveness only; does not check SQLite or the worker.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Disallowed browser Origin / CORS preflight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected sanitized server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "operationId": "readiness",
+        "summary": "Database access and worker-heartbeat readiness",
+        "description": "Database access and worker-heartbeat readiness. Does not verify Chromium installation or target-host reachability.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Disallowed browser Origin / CORS preflight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected sanitized server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable or worker heartbeat missing/stale",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
     }
   },
   "components": {
@@ -1326,215 +1316,95 @@
       }
     },
     "schemas": {
+      "Alt": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": ["missing"]
+              }
+            },
+            "required": ["state"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": ["empty", "text"]
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": ["state", "value"],
+            "additionalProperties": false
+          }
+        ],
+        "description": "Missing alt is distinct from intentionally empty decorative alt."
+      },
+      "AuditExport": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "$ref": "#/components/schemas/FetchMetadata"
+          },
+          "scan": {
+            "$ref": "#/components/schemas/Scan"
+          },
+          "baseUrl": {
+            "type": "string"
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Resource"
+            }
+          },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Occurrence"
+            }
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImageIssue"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "properties": {
+              "complete": {
+                "type": "boolean"
+              },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CoverageFinding"
+                }
+              }
+            },
+            "required": ["complete", "findings"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["page", "resources", "occurrences", "issues", "documents", "coverage"],
+        "additionalProperties": false
+      },
       "AuditId": {
         "type": "string",
         "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-      },
-      "Cursor": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 2048,
-        "pattern": "^[A-Za-z0-9_-]+$",
-        "description": "Opaque forward cursor. Pass unchanged; it never grants ownership. Save request cursors to revisit pages."
-      },
-      "ScanInput": {
-        "type": "object",
-        "properties": {
-          "mode": {
-            "type": "string",
-            "enum": [
-              "static",
-              "rendered",
-              "crawl"
-            ],
-            "default": "static"
-          },
-          "includeIframes": {
-            "type": "boolean",
-            "default": false
-          },
-          "maxPages": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 20,
-            "default": 10
-          },
-          "maxDepth": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 3,
-            "default": 2
-          }
-        },
-        "required": [],
-        "additionalProperties": false
-      },
-      "Scan": {
-        "type": "object",
-        "properties": {
-          "mode": {
-            "type": "string",
-            "enum": [
-              "static",
-              "rendered",
-              "crawl"
-            ],
-            "default": "static"
-          },
-          "includeIframes": {
-            "type": "boolean",
-            "default": false
-          },
-          "maxPages": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 20,
-            "default": 10
-          },
-          "maxDepth": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 3,
-            "default": 2
-          }
-        },
-        "required": [
-          "mode",
-          "includeIframes",
-          "maxPages",
-          "maxDepth"
-        ],
-        "additionalProperties": false
-      },
-      "CreateAudit": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2048,
-            "description": "HTTP/HTTPS URL without embedded credentials. Target host must be explicitly approved.",
-            "examples": [
-              "https://example.com/"
-            ]
-          },
-          "scan": {
-            "$ref": "#/components/schemas/ScanInput"
-          }
-        },
-        "required": [
-          "url"
-        ],
-        "additionalProperties": false
-      },
-      "State": {
-        "type": "string",
-        "enum": [
-          "queued",
-          "running",
-          "completed",
-          "failed"
-        ]
-      },
-      "CreatedAudit": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "$ref": "#/components/schemas/AuditId"
-          },
-          "state": {
-            "$ref": "#/components/schemas/State"
-          },
-          "statusUrl": {
-            "type": "string"
-          },
-          "imagesUrl": {
-            "type": "string"
-          },
-          "replayed": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "state",
-          "statusUrl",
-          "imagesUrl",
-          "replayed"
-        ],
-        "additionalProperties": false
-      },
-      "Progress": {
-        "type": "object",
-        "properties": {
-          "phase": {
-            "type": "string",
-            "enum": [
-              "queued",
-              "fetching-page",
-              "fetching-document",
-              "rendering-document",
-              "discovering-documents",
-              "inspecting-images",
-              "completed",
-              "failed"
-            ]
-          },
-          "documentsVisited": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "documentsScheduled": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "inspected": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "total": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "phase",
-          "inspected",
-          "total"
-        ],
-        "additionalProperties": false
-      },
-      "Failure": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "at": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "retryable": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "code",
-          "message",
-          "at",
-          "retryable"
-        ],
-        "additionalProperties": false
       },
       "AuditJob": {
         "type": "object",
@@ -1595,547 +1465,20 @@
         ],
         "additionalProperties": false
       },
-      "FetchMetadata": {
+      "AuditPage": {
         "type": "object",
         "properties": {
-          "url": {
-            "type": "string"
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "failed",
-              "skipped",
-              "deferred"
-            ]
-          },
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "status": {
-            "type": "integer"
-          },
-          "contentType": {
-            "type": "string"
-          },
-          "bytes": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "Bytes consumed; a lower bound when bytesComplete is false."
-          },
-          "bytesComplete": {
-            "type": "boolean"
-          },
-          "attempts": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "retryAfterMs": {
-            "type": "integer",
-            "minimum": 0
-          }
-        },
-        "required": [
-          "url",
-          "state",
-          "bytes",
-          "bytesComplete",
-          "attempts"
-        ],
-        "additionalProperties": false
-      },
-      "Resource": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string"
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "failed",
-              "skipped",
-              "deferred"
-            ]
-          },
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "status": {
-            "type": "integer"
-          },
-          "contentType": {
-            "type": "string"
-          },
-          "bytes": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "Bytes consumed; a lower bound when bytesComplete is false."
-          },
-          "bytesComplete": {
-            "type": "boolean"
-          },
-          "attempts": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "retryAfterMs": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "id": {
-            "type": "string"
-          },
-          "requestedUrl": {
-            "type": "string"
-          },
-          "oversized": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "url",
-          "state",
-          "bytes",
-          "bytesComplete",
-          "attempts",
-          "id",
-          "requestedUrl",
-          "oversized"
-        ],
-        "additionalProperties": false
-      },
-      "Candidate": {
-        "type": "object",
-        "properties": {
-          "rawUrl": {
-            "type": "string"
-          },
-          "attribute": {
-            "type": "string"
-          },
-          "element": {
-            "type": "string",
-            "enum": [
-              "img",
-              "source"
-            ]
-          },
-          "descriptor": {
-            "type": "string"
-          },
-          "media": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "fallback",
-              "responsive",
-              "lazy"
-            ]
-          },
-          "url": {
-            "type": "string"
-          },
-          "resourceId": {
-            "type": "string"
-          },
-          "skipped": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "rawUrl",
-          "attribute",
-          "element",
-          "role"
-        ],
-        "additionalProperties": false
-      },
-      "Alt": {
-        "oneOf": [
-          {
-            "type": "object",
-            "properties": {
-              "state": {
-                "type": "string",
-                "enum": [
-                  "missing"
-                ]
-              }
-            },
-            "required": [
-              "state"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "state": {
-                "type": "string",
-                "enum": [
-                  "empty",
-                  "text"
-                ]
-              },
-              "value": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "state",
-              "value"
-            ],
-            "additionalProperties": false
-          }
-        ],
-        "description": "Missing alt is distinct from intentionally empty decorative alt."
-      },
-      "Occurrence": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "documentUrl": {
-            "type": "string"
-          },
-          "documentId": {
-            "type": "string"
-          },
-          "alt": {
-            "$ref": "#/components/schemas/Alt"
-          },
-          "candidates": {
+          "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Candidate"
+              "$ref": "#/components/schemas/AuditJob"
             }
-          }
-        },
-        "required": [
-          "id",
-          "alt",
-          "candidates"
-        ],
-        "additionalProperties": false
-      },
-      "Image": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string"
           },
-          "occurrence": {
-            "$ref": "#/components/schemas/Occurrence"
-          },
-          "candidate": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Candidate"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "resource": {
-            "$ref": "#/components/schemas/Resource"
-          },
-          "issues": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "key",
-          "occurrence",
-          "candidate",
-          "issues"
-        ],
-        "additionalProperties": false,
-        "description": "One candidate row per occurrence, or a null candidate for an occurrence without sources. Resource is omitted for unresolved/skipped candidates. Occurrence candidates is empty in this projection; use the singular candidate field. Candidates are not proof of display."
-      },
-      "ImageIssue": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "occurrenceId": {
-            "type": "string"
-          },
-          "resourceId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "message"
-        ],
-        "additionalProperties": false
-      },
-      "Issue": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "occurrenceId": {
-            "type": "string"
-          },
-          "resourceId": {
-            "type": "string"
-          },
-          "scope": {
-            "type": "string",
-            "enum": [
-              "image",
-              "coverage"
-            ]
-          }
-        },
-        "required": [
-          "code",
-          "message",
-          "scope"
-        ],
-        "additionalProperties": false
-      },
-      "CoverageFinding": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "message"
-        ],
-        "additionalProperties": false
-      },
-      "Document": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "url": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "page",
-              "iframe"
-            ]
-          },
-          "depth": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "parentUrl": {
-            "type": "string"
-          },
-          "state": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "url",
-          "kind",
-          "depth",
-          "state"
-        ],
-        "additionalProperties": false
-      },
-      "Summary": {
-        "type": "object",
-        "properties": {
-          "uniqueResources": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "htmlOccurrences": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "candidates": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "issues": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "failedResources": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "oversizedResources": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "missingAlt": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "emptyAlt": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "coverageFindingCount": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "coverageComplete": {
-            "type": "boolean"
-          },
-          "pageState": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "uniqueResources",
-          "htmlOccurrences",
-          "candidates",
-          "issues",
-          "failedResources",
-          "oversizedResources",
-          "missingAlt",
-          "emptyAlt",
-          "coverageFindingCount",
-          "coverageComplete",
-          "pageState"
-        ],
-        "additionalProperties": false,
-        "description": "issues counts image findings; coverageFindingCount counts coverage findings. The issues endpoint returns both scopes."
-      },
-      "ResultMetadata": {
-        "type": "object",
-        "properties": {
           "page": {
-            "$ref": "#/components/schemas/FetchMetadata"
-          },
-          "scan": {
-            "$ref": "#/components/schemas/Scan"
-          },
-          "baseUrl": {
-            "type": "string"
-          },
-          "coverage": {
-            "type": "object",
-            "properties": {
-              "complete": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "complete"
-            ],
-            "additionalProperties": false
+            "$ref": "#/components/schemas/PageInfo"
           }
         },
-        "required": [
-          "page",
-          "coverage"
-        ],
-        "additionalProperties": false
-      },
-      "ResultHeader": {
-        "type": "object",
-        "properties": {
-          "attempt": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "summary": {
-            "$ref": "#/components/schemas/Summary"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/ResultMetadata"
-          },
-          "counts": {
-            "type": "object",
-            "properties": {
-              "summary": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "resources": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "occurrences": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "candidates": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "inventory": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "issues": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "documents": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "coverage": {
-                "type": "integer",
-                "minimum": 0
-              }
-            },
-            "required": [
-              "summary",
-              "resources",
-              "occurrences",
-              "candidates",
-              "inventory",
-              "issues",
-              "documents",
-              "coverage"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "attempt",
-          "summary",
-          "metadata",
-          "counts"
-        ],
+        "required": ["items", "page"],
         "additionalProperties": false
       },
       "AuditStatus": {
@@ -2208,46 +1551,471 @@
         ],
         "additionalProperties": false
       },
-      "PageInfo": {
+      "Candidate": {
         "type": "object",
         "properties": {
-          "nextCursor": {
+          "rawUrl": {
+            "type": "string"
+          },
+          "attribute": {
+            "type": "string"
+          },
+          "element": {
+            "type": "string",
+            "enum": ["img", "source"]
+          },
+          "descriptor": {
+            "type": "string"
+          },
+          "media": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["fallback", "responsive", "lazy"]
+          },
+          "url": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "skipped": {
+            "type": "string"
+          }
+        },
+        "required": ["rawUrl", "attribute", "element", "role"],
+        "additionalProperties": false
+      },
+      "CoverageFinding": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["code", "message"],
+        "additionalProperties": false
+      },
+      "CreateAudit": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "description": "HTTP/HTTPS URL without embedded credentials. Target host must be explicitly approved.",
+            "examples": ["https://example.com/"]
+          },
+          "scan": {
+            "$ref": "#/components/schemas/ScanInput"
+          }
+        },
+        "required": ["url"],
+        "additionalProperties": false
+      },
+      "CreatedAudit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AuditId"
+          },
+          "state": {
+            "$ref": "#/components/schemas/State"
+          },
+          "statusUrl": {
+            "type": "string"
+          },
+          "imagesUrl": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "state", "statusUrl", "imagesUrl", "replayed"],
+        "additionalProperties": false
+      },
+      "Cursor": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2048,
+        "pattern": "^[A-Za-z0-9_-]+$",
+        "description": "Opaque forward cursor. Pass unchanged; it never grants ownership. Save request cursors to revisit pages."
+      },
+      "DemoCall": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": ["start_audit"]
+              },
+              "arguments": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "description": "HTTP/HTTPS URL without embedded credentials. Target host must be explicitly approved.",
+                    "examples": ["https://example.com/"]
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+                  }
+                },
+                "required": ["url", "idempotencyKey"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["name", "arguments"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": ["get_audit_status"]
+              },
+              "arguments": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/components/schemas/AuditId"
+                  }
+                },
+                "required": ["id"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["name", "arguments"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": ["get_audit_results"]
+              },
+              "arguments": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/components/schemas/AuditId"
+                  },
+                  "section": {
+                    "type": "string",
+                    "enum": ["issues"]
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "cursor": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  }
+                },
+                "required": ["id", "section", "limit"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["name", "arguments"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": ["list_audits"]
+              },
+              "arguments": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  }
+                },
+                "required": ["limit"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["name", "arguments"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "DemoReply": {
+        "type": "object",
+        "properties": {
+          "transport": {
+            "type": "string",
+            "enum": ["stdio"]
+          },
+          "tool": {
+            "type": "string",
+            "enum": ["start_audit", "get_audit_status", "get_audit_results", "list_audits"]
+          },
+          "result": {
+            "type": "object",
+            "description": "Official MCP CallToolResult; protocol-defined fields may be present. Tool errors can have isError=true while HTTP succeeds. See docs/MCP.md for structured tool data.",
+            "properties": {
+              "content": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "structuredContent": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "isError": {
+                "type": "boolean"
+              }
+            },
+            "required": ["content"],
+            "additionalProperties": true
+          }
+        },
+        "required": ["transport", "tool", "result"],
+        "additionalProperties": false
+      },
+      "Document": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["page", "iframe"]
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "parentUrl": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "url", "kind", "depth", "state"],
+        "additionalProperties": false
+      },
+      "DocumentsPage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AuditId"
+          },
+          "state": {
+            "$ref": "#/components/schemas/State"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "attempt": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Cursor"
+                "type": "integer",
+                "minimum": 0
               },
               {
                 "type": "null"
               }
             ]
           },
-          "hasMore": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "nextCursor",
-          "hasMore"
-        ],
-        "additionalProperties": false
-      },
-      "AuditPage": {
-        "type": "object",
-        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/AuditJob"
+              "$ref": "#/components/schemas/Document"
             }
           },
           "page": {
             "$ref": "#/components/schemas/PageInfo"
           }
         },
-        "required": [
-          "items",
-          "page"
-        ],
+        "required": ["id", "state", "available", "attempt", "total", "items", "page"],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": ["code", "message"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["error"],
+        "additionalProperties": false
+      },
+      "Failure": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "at": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": ["code", "message", "at", "retryable"],
+        "additionalProperties": false
+      },
+      "FetchMetadata": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["ok", "failed", "skipped", "deferred"]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Bytes consumed; a lower bound when bytesComplete is false."
+          },
+          "bytesComplete": {
+            "type": "boolean"
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retryAfterMs": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["url", "state", "bytes", "bytesComplete", "attempts"],
+        "additionalProperties": false
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["ok"]
+          },
+          "service": {
+            "type": "string",
+            "enum": ["website-image-audit"]
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["fixture"]
+          }
+        },
+        "required": ["status", "service"],
+        "additionalProperties": false
+      },
+      "Image": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "occurrence": {
+            "$ref": "#/components/schemas/Occurrence"
+          },
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Candidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resource": {
+            "$ref": "#/components/schemas/Resource"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["key", "occurrence", "candidate", "issues"],
+        "additionalProperties": false,
+        "description": "One candidate row per occurrence, or a null candidate for an occurrence without sources. Resource is omitted for unresolved/skipped candidates. Occurrence candidates is empty in this projection; use the singular candidate field. Candidates are not proof of display."
+      },
+      "ImageIssue": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "occurrenceId": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          }
+        },
+        "required": ["code", "message"],
         "additionalProperties": false
       },
       "ImagesPage": {
@@ -2287,14 +2055,243 @@
             "$ref": "#/components/schemas/PageInfo"
           }
         },
+        "required": ["id", "state", "available", "attempt", "total", "items", "page"],
+        "additionalProperties": false
+      },
+      "Issue": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "occurrenceId": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["image", "coverage"]
+          }
+        },
+        "required": ["code", "message", "scope"],
+        "additionalProperties": false
+      },
+      "IssuesPage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AuditId"
+          },
+          "state": {
+            "$ref": "#/components/schemas/State"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "attempt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Issue"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": ["id", "state", "available", "attempt", "total", "items", "page"],
+        "additionalProperties": false
+      },
+      "Occurrence": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "documentUrl": {
+            "type": "string"
+          },
+          "documentId": {
+            "type": "string"
+          },
+          "alt": {
+            "$ref": "#/components/schemas/Alt"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            }
+          }
+        },
+        "required": ["id", "alt", "candidates"],
+        "additionalProperties": false
+      },
+      "PageInfo": {
+        "type": "object",
+        "properties": {
+          "nextCursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cursor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": ["nextCursor", "hasMore"],
+        "additionalProperties": false
+      },
+      "Progress": {
+        "type": "object",
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "fetching-page",
+              "fetching-document",
+              "rendering-document",
+              "discovering-documents",
+              "inspecting-images",
+              "completed",
+              "failed"
+            ]
+          },
+          "documentsVisited": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "documentsScheduled": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "inspected": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["phase", "inspected", "total"],
+        "additionalProperties": false
+      },
+      "Readiness": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["ready", "not_ready"]
+          },
+          "checks": {
+            "type": "object",
+            "properties": {
+              "database": {
+                "type": "string",
+                "enum": ["ready", "unavailable"]
+              },
+              "worker": {
+                "type": "string",
+                "enum": ["ready", "unavailable", "unknown"]
+              }
+            },
+            "required": ["database", "worker"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["status", "checks"],
+        "additionalProperties": false
+      },
+      "Resource": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["ok", "failed", "skipped", "deferred"]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Bytes consumed; a lower bound when bytesComplete is false."
+          },
+          "bytesComplete": {
+            "type": "boolean"
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retryAfterMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string"
+          },
+          "requestedUrl": {
+            "type": "string"
+          },
+          "oversized": {
+            "type": "boolean"
+          }
+        },
         "required": [
-          "id",
+          "url",
           "state",
-          "available",
-          "attempt",
-          "total",
-          "items",
-          "page"
+          "bytes",
+          "bytesComplete",
+          "attempts",
+          "id",
+          "requestedUrl",
+          "oversized"
         ],
         "additionalProperties": false
       },
@@ -2335,114 +2332,75 @@
             "$ref": "#/components/schemas/PageInfo"
           }
         },
-        "required": [
-          "id",
-          "state",
-          "available",
-          "attempt",
-          "total",
-          "items",
-          "page"
-        ],
+        "required": ["id", "state", "available", "attempt", "total", "items", "page"],
         "additionalProperties": false
       },
-      "DocumentsPage": {
+      "ResultHeader": {
         "type": "object",
         "properties": {
-          "id": {
-            "$ref": "#/components/schemas/AuditId"
-          },
-          "state": {
-            "$ref": "#/components/schemas/State"
-          },
-          "available": {
-            "type": "boolean"
-          },
           "attempt": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "total": {
             "type": "integer",
             "minimum": 0
           },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Document"
-            }
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
           },
-          "page": {
-            "$ref": "#/components/schemas/PageInfo"
-          }
-        },
-        "required": [
-          "id",
-          "state",
-          "available",
-          "attempt",
-          "total",
-          "items",
-          "page"
-        ],
-        "additionalProperties": false
-      },
-      "IssuesPage": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "$ref": "#/components/schemas/AuditId"
+          "metadata": {
+            "$ref": "#/components/schemas/ResultMetadata"
           },
-          "state": {
-            "$ref": "#/components/schemas/State"
-          },
-          "available": {
-            "type": "boolean"
-          },
-          "attempt": {
-            "anyOf": [
-              {
+          "counts": {
+            "type": "object",
+            "properties": {
+              "summary": {
                 "type": "integer",
                 "minimum": 0
               },
-              {
-                "type": "null"
+              "resources": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "occurrences": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "candidates": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "inventory": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "issues": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "documents": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "coverage": {
+                "type": "integer",
+                "minimum": 0
               }
-            ]
-          },
-          "total": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Issue"
-            }
-          },
-          "page": {
-            "$ref": "#/components/schemas/PageInfo"
+            },
+            "required": [
+              "summary",
+              "resources",
+              "occurrences",
+              "candidates",
+              "inventory",
+              "issues",
+              "documents",
+              "coverage"
+            ],
+            "additionalProperties": false
           }
         },
-        "required": [
-          "id",
-          "state",
-          "available",
-          "attempt",
-          "total",
-          "items",
-          "page"
-        ],
+        "required": ["attempt", "summary", "metadata", "counts"],
         "additionalProperties": false
       },
-      "AuditExport": {
+      "ResultMetadata": {
         "type": "object",
         "properties": {
           "page": {
@@ -2454,351 +2412,141 @@
           "baseUrl": {
             "type": "string"
           },
-          "resources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Resource"
-            }
-          },
-          "occurrences": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Occurrence"
-            }
-          },
-          "issues": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ImageIssue"
-            }
-          },
-          "documents": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Document"
-            }
-          },
           "coverage": {
             "type": "object",
             "properties": {
               "complete": {
                 "type": "boolean"
-              },
-              "findings": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/CoverageFinding"
-                }
               }
             },
-            "required": [
-              "complete",
-              "findings"
-            ],
+            "required": ["complete"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "page",
-          "resources",
-          "occurrences",
-          "issues",
-          "documents",
-          "coverage"
-        ],
+        "required": ["page", "coverage"],
         "additionalProperties": false
       },
-      "Error": {
+      "Scan": {
         "type": "object",
         "properties": {
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "code",
-              "message"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "error"
-        ],
-        "additionalProperties": false
-      },
-      "Health": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "ok"
-            ]
-          },
-          "service": {
-            "type": "string",
-            "enum": [
-              "website-image-audit"
-            ]
-          },
           "mode": {
             "type": "string",
-            "enum": [
-              "fixture"
-            ]
+            "enum": ["static", "rendered", "crawl"],
+            "default": "static"
+          },
+          "includeIframes": {
+            "type": "boolean",
+            "default": false
+          },
+          "maxPages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "default": 2
           }
         },
-        "required": [
-          "status",
-          "service"
-        ],
+        "required": ["mode", "includeIframes", "maxPages", "maxDepth"],
         "additionalProperties": false
       },
-      "Readiness": {
+      "ScanInput": {
         "type": "object",
         "properties": {
-          "status": {
+          "mode": {
             "type": "string",
-            "enum": [
-              "ready",
-              "not_ready"
-            ]
+            "enum": ["static", "rendered", "crawl"],
+            "default": "static"
           },
-          "checks": {
-            "type": "object",
-            "properties": {
-              "database": {
-                "type": "string",
-                "enum": [
-                  "ready",
-                  "unavailable"
-                ]
-              },
-              "worker": {
-                "type": "string",
-                "enum": [
-                  "ready",
-                  "unavailable",
-                  "unknown"
-                ]
-              }
-            },
-            "required": [
-              "database",
-              "worker"
-            ],
-            "additionalProperties": false
+          "includeIframes": {
+            "type": "boolean",
+            "default": false
+          },
+          "maxPages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 10
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "default": 2
           }
         },
-        "required": [
-          "status",
-          "checks"
-        ],
+        "required": [],
         "additionalProperties": false
       },
-      "DemoCall": {
-        "oneOf": [
-          {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "enum": [
-                  "start_audit"
-                ]
-              },
-              "arguments": {
-                "type": "object",
-                "properties": {
-                  "url": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 2048,
-                    "description": "HTTP/HTTPS URL without embedded credentials. Target host must be explicitly approved.",
-                    "examples": [
-                      "https://example.com/"
-                    ]
-                  },
-                  "idempotencyKey": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9._:-]{1,128}$"
-                  }
-                },
-                "required": [
-                  "url",
-                  "idempotencyKey"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "name",
-              "arguments"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "enum": [
-                  "get_audit_status"
-                ]
-              },
-              "arguments": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "$ref": "#/components/schemas/AuditId"
-                  }
-                },
-                "required": [
-                  "id"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "name",
-              "arguments"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "enum": [
-                  "get_audit_results"
-                ]
-              },
-              "arguments": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "$ref": "#/components/schemas/AuditId"
-                  },
-                  "section": {
-                    "type": "string",
-                    "enum": [
-                      "issues"
-                    ]
-                  },
-                  "limit": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 20
-                  },
-                  "cursor": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 2048
-                  }
-                },
-                "required": [
-                  "id",
-                  "section",
-                  "limit"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "name",
-              "arguments"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "enum": [
-                  "list_audits"
-                ]
-              },
-              "arguments": {
-                "type": "object",
-                "properties": {
-                  "limit": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 20
-                  }
-                },
-                "required": [
-                  "limit"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "name",
-              "arguments"
-            ],
-            "additionalProperties": false
-          }
-        ]
+      "State": {
+        "type": "string",
+        "enum": ["queued", "running", "completed", "failed"]
       },
-      "DemoReply": {
+      "Summary": {
         "type": "object",
         "properties": {
-          "transport": {
-            "type": "string",
-            "enum": [
-              "stdio"
-            ]
+          "uniqueResources": {
+            "type": "integer",
+            "minimum": 0
           },
-          "tool": {
-            "type": "string",
-            "enum": [
-              "start_audit",
-              "get_audit_status",
-              "get_audit_results",
-              "list_audits"
-            ]
+          "htmlOccurrences": {
+            "type": "integer",
+            "minimum": 0
           },
-          "result": {
-            "type": "object",
-            "description": "Official MCP CallToolResult; protocol-defined fields may be present. Tool errors can have isError=true while HTTP succeeds. See docs/MCP.md for structured tool data.",
-            "properties": {
-              "content": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              },
-              "structuredContent": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "isError": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "content"
-            ],
-            "additionalProperties": true
+          "candidates": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "issues": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failedResources": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "oversizedResources": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missingAlt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "emptyAlt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "coverageFindingCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "coverageComplete": {
+            "type": "boolean"
+          },
+          "pageState": {
+            "type": "string"
           }
         },
         "required": [
-          "transport",
-          "tool",
-          "result"
+          "uniqueResources",
+          "htmlOccurrences",
+          "candidates",
+          "issues",
+          "failedResources",
+          "oversizedResources",
+          "missingAlt",
+          "emptyAlt",
+          "coverageFindingCount",
+          "coverageComplete",
+          "pageState"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "issues counts image findings; coverageFindingCount counts coverage findings. The issues endpoint returns both scopes."
       }
     }
   }
