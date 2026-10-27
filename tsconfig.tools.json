@@ -1,19 +1,12 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "types": [
-      "node"
-    ],
     "noEmit": true,
-    "allowJs": true,
-    "checkJs": true
+    "types": ["node"]
   },
-  "include": [
-    "vite.config.ts",
-    "playwright.config.ts",
-    "tests/**/*.ts",
-    "scripts/*.mjs"
-  ]
+  "include": ["playwright.config.ts", "scripts/*.mjs", "tests/**/*.ts", "vite.config.ts"]
 }

@@ -12,10 +12,10 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
         .filter(Boolean);
   createUrlPolicy(approvedHosts); // Fail fast for malformed configuration.
   return {
-    fixtureMode,
+    approvedHosts,
     databasePath: resolve(
       fixtureMode ? 'data/demo/audits.sqlite' : (env['AUDIT_DB_PATH'] ?? 'data/audits.sqlite'),
     ),
-    approvedHosts,
+    fixtureMode,
   };
 }
