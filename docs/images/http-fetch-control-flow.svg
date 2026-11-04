@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="2000" viewBox="0 0 1560 2000" role="img" aria-labelledby="title desc">
+<title id="title">HTTP fetch lifecycle</title><desc id="desc">Three layers: URL policy and redirect traversal, retry decisions, and one bounded HTTP attempt. Detailed Mermaid source is in docs/DECISIONS.md.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#475569"/></marker><filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#16324f" flood-opacity=".09"/></filter><marker id="componentArrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 1 L11 6 L1 11Z" fill="#245b9e"/></marker></defs>
+<rect width="1560" height="2000" fill="#edf2f7"/>
+<text x="40" y="49" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" text-anchor="start" fill="#203247"><tspan x="40" dy="0">HTTP fetch lifecycle</tspan></text>
+<text x="40" y="80" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#526277"><tspan x="40" dy="0">Validated targets. Recoverable attempts. Bounded responses.</tspan></text>
+<circle cx="650" cy="49" r="7" fill="#e3effc" stroke="#7298c1"/>
+<text x="664" y="54" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#203247"><tspan x="664" dy="0">Operation</tspan></text>
+<circle cx="824" cy="49" r="7" fill="#fff2cb" stroke="#c6a24a"/>
+<text x="838" y="54" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#203247"><tspan x="838" dy="0">Decision</tspan></text>
+<circle cx="998" cy="49" r="7" fill="#dff1df" stroke="#7aab7a"/>
+<text x="1012" y="54" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#203247"><tspan x="1012" dy="0">Success</tspan></text>
+<circle cx="1172" cy="49" r="7" fill="#ffe1db" stroke="#cc8174"/>
+<text x="1186" y="54" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#203247"><tspan x="1186" dy="0">Failure</tspan></text>
+<circle cx="1346" cy="49" r="7" fill="#ffecd5" stroke="#c79964"/>
+<text x="1360" y="54" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#203247"><tspan x="1360" dy="0">Skipped / deferred</tspan></text>
+<rect x="30" y="110" width="1500" height="410" rx="16" fill="white" stroke="#c9d5e2"/>
+<rect x="50" y="128" width="36" height="36" rx="10" fill="#263e59"/>
+<text x="68" y="153" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" text-anchor="middle" fill="white"><tspan x="68" dy="0">1</tspan></text>
+<text x="102" y="147" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#203247"><tspan x="102" dy="0">createFetcher()  ·  Policy, cache &amp; redirects</tspan></text>
+<text x="102" y="171" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#64748b"><tspan x="102" dy="0">Each fetch has a visited set; image-hop promises are shared within the fetcher instance.</tspan></text>
+<rect x="65" y="210" width="225" height="65" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="177.5" y="237.06" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="177.5" dy="0">Validate &amp; normalize</tspan><tspan x="177.5" dy="22.1">current URL</tspan></text>
+<path d="M460.0 195 L555 242.5 L460.0 290 L365 242.5Z" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5"/>
+<text x="460.0" y="237.06" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="460.0" dy="0">URL already</tspan><tspan x="460.0" dy="22.1">visited?</tspan></text>
+<rect x="630" y="210" width="290" height="65" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="775.0" y="237.06" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="775.0" dy="0">Mark visited; get image cache</tspan><tspan x="775.0" dy="22.1">or create withRetry promise</tspan></text>
+<path d="M1100.0 195 L1200 242.5 L1100.0 290 L1000 242.5Z" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5"/>
+<text x="1100.0" y="237.06" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1100.0" dy="0">Hop has</tspan><tspan x="1100.0" dy="22.1">Location?</tspan></text>
+<rect x="1270" y="212" width="220" height="60" rx="10" fill="#f1f5f9" stroke="#9aaaba" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1380.0" y="247.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1380.0" dy="0">Return hop result</tspan></text>
+<polyline points="290,242 365,242" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<polyline points="555,242 630,242" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="590" y="231" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="590" dy="0">No</tspan></text>
+<polyline points="920,242 1000,242" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="960" y="231" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="960" dy="0">Await</tspan></text>
+<polyline points="1200,242 1270,242" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="1235" y="231" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="1235" dy="0">No</tspan></text>
+<rect x="65" y="329" width="225" height="54" rx="27.0" fill="#ffecd5" stroke="#c79964" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="177.5" y="361.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="177.5" dy="0">Skipped: policy code</tspan></text>
+<polyline points="177,275 177,329" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="222" y="307" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="222" dy="0">Rejected</tspan></text>
+<rect x="350" y="329" width="220" height="54" rx="27.0" fill="#ffe1db" stroke="#cc8174" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="460.0" y="361.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="460.0" dy="0">Failed: redirect-loop</tspan></text>
+<polyline points="460,290 460,329" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="484" y="315" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="484" dy="0">Yes</tspan></text>
+<rect x="900" y="330" width="365" height="66" rx="10" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1082.5" y="357.56" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1082.5" dy="0">Check redirect limit;</tspan><tspan x="1082.5" dy="22.1">resolve &amp; validate Location</tspan></text>
+<polyline points="1100,290 1100,330" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="1125" y="315" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="1125" dy="0">Yes</tspan></text>
+<rect x="1290" y="330" width="200" height="66" rx="10" fill="#f1f5f9" stroke="#9aaaba" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1390.0" y="358.2" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1390.0" dy="0">Failed: redirect-limit</tspan><tspan x="1390.0" dy="19.5">Skipped: rejected target</tspan></text>
+<polyline points="1265,363 1290,363" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<polyline points="900,363 770,363 770,443 45,443 45,242 65,242" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="487" y="433" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="487" dy="0">Approved: update URL, increment redirects, repeat</tspan></text>
+<text x="65" y="493" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="start" fill="#526277"><tspan x="65" dy="0">Image cache stores promises immediately, including redirect and failure outcomes. Cache hits still follow redirects.</tspan></text>
+<g transform="translate(0 60)"><rect x="30" y="540" width="1500" height="340" rx="16" fill="white" stroke="#c9d5e2"/>
+<rect x="50" y="558" width="36" height="36" rx="10" fill="#263e59"/>
+<text x="68" y="583" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" text-anchor="middle" fill="white"><tspan x="68" dy="0">2</tspan></text>
+<text x="102" y="577" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#203247"><tspan x="102" dy="0">withRetry()  ·  Retry one URL / hop</tspan></text>
+<text x="102" y="601" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#64748b"><tspan x="102" dy="0">Maximum requests per hop = maxRetries + 1. Each request has a fresh deadline.</tspan></text>
+<rect x="65" y="650" width="235" height="66" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="182.5" y="677.5600000000001" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="182.5" dy="0">Await requestOnce()</tspan><tspan x="182.5" dy="22.1">Set attempts = attempt + 1</tspan></text>
+<path d="M475.0 631 L595 683.5 L475.0 736 L355 683.5Z" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5"/>
+<text x="475.0" y="678.0600000000001" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="475.0" dy="0">Transient and</tspan><tspan x="475.0" dy="22.1">retries remain?</tspan></text>
+<rect x="665" y="645" width="305" height="76" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="817.5" y="677.5600000000001" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="817.5" dy="0">Calculate backoff + jitter</tspan><tspan x="817.5" dy="22.1">delay = max(backoff, Retry-After)</tspan></text>
+<path d="M1155.0 631 L1270 683.5 L1155.0 736 L1040 683.5Z" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5"/>
+<text x="1155.0" y="678.0600000000001" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1155.0" dy="0">Invalid Retry-After</tspan><tspan x="1155.0" dy="22.1">or delay over cap?</tspan></text>
+<rect x="1320" y="654" width="170" height="56" rx="28.0" fill="#ffecd5" stroke="#c79964" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1405.0" y="686.95" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1405.0" dy="0">Deferred: retry-after</tspan></text>
+<polyline points="300,683 355,683" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<polyline points="595,683 665,683" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="630" y="672" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="630" dy="0">Yes</tspan></text>
+<polyline points="970,683 1040,683" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<polyline points="1270,683 1320,683" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="1296" y="672" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="1296" dy="0">Yes</tspan></text>
+<rect x="355" y="780" width="240" height="54" rx="10" fill="#f1f5f9" stroke="#9aaaba" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="475.0" y="812.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="475.0" dy="0">Return existing result</tspan></text>
+<polyline points="475,736 475,780" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="498" y="763" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="498" dy="0">No</tspan></text>
+<rect x="1000" y="780" width="310" height="54" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1155.0" y="812.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1155.0" dy="0">Wait ceil(delay); increment attempt</tspan></text>
+<polyline points="1155,736 1155,780" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="1178" y="763" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="1178" dy="0">No</tspan></text>
+<polyline points="1310,807 1505,807 1505,613 182,613 182,650" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="65" y="856" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="start" fill="#526277"><tspan x="65" dy="0">Retry-After is evaluated only when another retry is eligible; the delay cap is per wait, not a total fetch deadline.</tspan></text>
+</g><g transform="translate(0 120)"><rect x="30" y="900" width="1500" height="850" rx="16" fill="white" stroke="#c9d5e2"/>
+<rect x="50" y="918" width="36" height="36" rx="10" fill="#263e59"/>
+<text x="68" y="943" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" text-anchor="middle" fill="white"><tspan x="68" dy="0">3</tspan></text>
+<text x="102" y="937" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#203247"><tspan x="102" dy="0">requestOnce()  ·  One bounded HTTP attempt</tspan></text>
+<text x="102" y="961" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#64748b"><tspan x="102" dy="0">Start the deadline before GET. No automatic redirects, caller cookies, or caller authentication.</tspan></text>
+<rect x="65" y="1000" width="290" height="70" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="210.0" y="1029.56" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="210.0" dy="0">Start timer and send GET</tspan><tspan x="210.0" dy="22.1">Wait for response headers</tspan></text>
+<rect x="65" y="1110" width="290" height="75" rx="37.5" fill="#ffe1db" stroke="#cc8174" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="210.0" y="1142.3799999999999" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="210.0" dy="0">Timeout → failed: timeout</tspan><tspan x="210.0" dy="20.8">Request error → failed: network</tspan></text>
+<polyline points="210,1070 210,1110" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="279" y="1095" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="279" dy="0">Before completion</tspan></text>
+<rect x="65" y="1230" width="290" height="105" rx="10" fill="#f1f5f9" stroke="#9aaaba" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="210.0" y="1259.82" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="210.0" dy="0">Timeouts are transient.</tspan><tspan x="210.0" dy="18.2">Request errors retry only for:</tspan><tspan x="210.0" dy="18.2">ECONNRESET, ETIMEDOUT,</tspan><tspan x="210.0" dy="18.2">EAI_AGAIN, ECONNREFUSED, EPIPE</tspan></text>
+<polyline points="355,1035 425,1035" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<path d="M540.0 992 L655 1035.0 L540.0 1078 L425 1035.0Z" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5"/>
+<text x="540.0" y="1040.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="540.0" dy="0">Redirect status?</tspan></text>
+<rect x="750" y="1005" width="690" height="60" rx="10" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1095.0" y="1040.28" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1095.0" dy="0">Location present → ok hop with Location; missing → failed: invalid-redirect</tspan></text>
+<polyline points="655,1035 750,1035" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="703" y="1024" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="703" dy="0">Yes</tspan></text>
+<path d="M540.0 1120 L655 1163.0 L540.0 1206 L425 1163.0Z" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5"/>
+<text x="540.0" y="1168.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="540.0" dy="0">206 or non-2xx?</tspan></text>
+<polyline points="540,1078 540,1120" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="562" y="1104" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="562" dy="0">No</tspan></text>
+<rect x="750" y="1123" width="690" height="80" rx="40.0" fill="#ffe1db" stroke="#cc8174" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1095.0" y="1157.8799999999999" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1095.0" dy="0">206 → failed: http (no retry). Other non-2xx → failed: http.</tspan><tspan x="1095.0" dy="20.8">Transient only for 408, 429, 500, 502, 503, 504; parse Retry-After.</tspan></text>
+<polyline points="655,1163 750,1163" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="703" y="1152" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="703" dy="0">Yes</tspan></text>
+<path d="M540.0 1250 L655 1293.0 L540.0 1336 L425 1293.0Z" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5"/>
+<text x="540.0" y="1287.56" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="540.0" dy="0">Valid MIME type</tspan><tspan x="540.0" dy="22.1">for fetch kind?</tspan></text>
+<polyline points="540,1206 540,1250" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="562" y="1233" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="562" dy="0">No</tspan></text>
+<rect x="750" y="1263" width="310" height="60" rx="30.0" fill="#ffe1db" stroke="#cc8174" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="905.0" y="1298.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="905.0" dy="0">Failed: content-type</tspan></text>
+<polyline points="655,1293 750,1293" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="703" y="1282" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="703" dy="0">No</tspan></text>
+<path d="M540.0 1380 L655 1423.0 L540.0 1466 L425 1423.0Z" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5"/>
+<text x="540.0" y="1417.56" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="540.0" dy="0">Encoding absent,</tspan><tspan x="540.0" dy="22.1">empty, or identity?</tspan></text>
+<polyline points="540,1336 540,1380" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="562" y="1363" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="562" dy="0">Yes</tspan></text>
+<rect x="750" y="1393" width="310" height="60" rx="30.0" fill="#ffecd5" stroke="#c79964" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="905.0" y="1428.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="905.0" dy="0">Skipped: encoding</tspan></text>
+<polyline points="655,1423 750,1423" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="703" y="1412" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="703" dy="0">No</tspan></text>
+<rect x="425" y="1510" width="230" height="80" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="540.0" y="1533.51" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="540.0" dy="0">Stream body events</tspan><tspan x="540.0" dy="22.1">Count every chunk</tspan><tspan x="540.0" dy="22.1">Check byte cap first</tspan></text>
+<polyline points="540,1466 540,1510" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="562" y="1493" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="562" dy="0">Yes</tspan></text>
+<rect x="750" y="1498" width="330" height="54" rx="27.0" fill="#ffe1db" stroke="#cc8174" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="915.0" y="1530.28" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="915.0" dy="0">Over cap → failed: byte-limit</tspan></text>
+<polyline points="655,1534 700,1534 700,1525 750,1525" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<rect x="750" y="1572" width="330" height="54" rx="27.0" fill="#ffe1db" stroke="#cc8174" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="915.0" y="1603.95" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="915.0" dy="0">Stream error → network (transient)</tspan></text>
+<polyline points="655,1565 700,1565 700,1599 750,1599" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<rect x="65" y="1510" width="290" height="80" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="210.0" y="1534.48" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="210.0" dy="0">Within cap: discard image data;</tspan><tspan x="210.0" dy="20.8">buffer document / asset data.</tspan><tspan x="210.0" dy="20.8">Continue to next event.</tspan></text>
+<polyline points="425,1540 355,1540" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<polyline points="210,1590 210,1636 540,1636 540,1590" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<rect x="1140" y="1505" width="300" height="100" rx="50.0" fill="#dff1df" stroke="#7aab7a" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1290.0" y="1539.48" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1290.0" dy="0">On stream end: ok</tspan><tspan x="1290.0" dy="20.8">bytesComplete = true</tspan><tspan x="1290.0" dy="20.8">Body + charset for non-images</tspan></text>
+<polyline points="655,1550 1110,1550 1110,1555 1140,1555" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="1108" y="1540" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="1108" dy="0">end</tspan></text>
+<rect x="65" y="1680" width="1375" height="44" rx="10" fill="#f1f5f9" stroke="#9aaaba" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="752.5" y="1707.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="752.5" dy="0">finish() accepts the first outcome, clears the timer, resolves the hop, releases chunks, and aborts the request.</tspan></text>
+<text x="65" y="1738" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#526277"><tspan x="65" dy="0">All terminal outcomes use finish(). Later timeout, error, or end events cannot replace the result.</tspan></text>
+</g><g transform="translate(0 120)"><text x="40" y="1803" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" text-anchor="start" fill="#526277"><tspan x="40" dy="0">READING NOTES</tspan></text>
+<text x="40" y="1830" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="start" fill="#203247"><tspan x="40" dy="0">Redirect status: 301 / 302 / 303 / 307 / 308.  Image cap: maxImageBytes.  Document / asset cap: maxPageBytes.</tspan></text>
+<text x="40" y="1857" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="start" fill="#526277"><tspan x="40" dy="0">Detailed branch logic and editable Mermaid source: docs/DECISIONS.md → HTTP fetch control flow.</tspan></text>
+
+</g><g><path d="M780 524 V590" stroke="#245b9e" stroke-width="5" fill="none" marker-end="url(#componentArrow)"/><rect x="810" y="542" width="255" height="36" rx="8" fill="#dce9f9"/><text x="828" y="567" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#245b9e">calls withRetry()</text></g><g><path d="M780 944 V1010" stroke="#245b9e" stroke-width="5" fill="none" marker-end="url(#componentArrow)"/><rect x="810" y="962" width="255" height="36" rx="8" fill="#dce9f9"/><text x="828" y="987" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" fill="#245b9e">calls requestOnce()</text></g></svg>
