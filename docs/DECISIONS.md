@@ -186,6 +186,133 @@ Trade-off: rendering adds browser installation, execution risk and more dependen
 timed snapshots and isolated frames are not faithful full interactive sessions.
 Neither discovery strategy establishes visibility or accessibility compliance.
 
+## HTTP fetch control flow
+
+The [HTTP adapter](../src/application/audit/adapters/http-fetcher.ts) separates
+redirect traversal, per-hop retries, and a single request. Expand each diagram
+for its control flow. These diagrams describe Node HTTP fetching, not Chromium's
+entire request lifecycle.
+
+[![Combined HTTP fetch flow: redirects, retries, and a single request](images/http-fetch-control-flow.svg)](images/http-fetch-control-flow.svg)
+
+Open the SVG at full size to inspect the branches. The Mermaid source below is
+the editable source of truth; regenerate the SVG when these flows change.
+
+<details>
+<summary>1. createFetcher(): policy, image-hop cache, and redirects</summary>
+
+```mermaid
+flowchart TD
+    Start([Fetch URL]) --> Init["Initialize current URL, attempts = 0, redirects = 0, visited set"]
+    Init --> Policy["Validate and normalize current URL"]
+    Policy -->|Rejected| Skipped["Return skipped: policy rejection code"]
+    Policy -->|Approved| Loop{"Normalized URL already visited?"}
+    Loop -->|Yes| Cycle["Return failed: redirect-loop"]
+    Loop -->|No| Visit["Add URL to visited set"]
+    Visit --> Cache{"Image kind and cached promise?"}
+    Cache -->|Yes| Await["Await hop promise"]
+    Cache -->|No| Create["Create withRetry promise"]
+    Create --> Store["For images, cache promise immediately"]
+    Store --> Await
+    Await --> Count["Add hop attempts to total"]
+    Count --> Redirect{"Hop has Location?"}
+    Redirect -->|No| Return([Return hop result with total attempts])
+    Redirect -->|Yes| Limit{"redirects >= maxRedirects?"}
+    Limit -->|Yes| LimitFail["Return failed: redirect-limit"]
+    Limit -->|No| Target["Resolve and validate Location against current URL"]
+    Target -->|Rejected| TargetFail["Return skipped: policy code or invalid-redirect"]
+    Target -->|Approved| Update["Set current URL; increment redirects"]
+    Update --> Policy
+```
+
+The cache belongs to one fetcher instance and stores image-hop promises, including
+redirects and failures. Cache hits still undergo redirect handling. Attempt totals
+include cached hop metadata; they are not counts of newly issued network requests.
+
+</details>
+
+<details>
+<summary>2. withRetry(): retry eligibility and Retry-After</summary>
+
+```mermaid
+flowchart TD
+    Start([Retry one URL and kind]) --> Init["attempt = 0"]
+    Init --> Once["Await requestOnce"]
+    Once --> Count["Set result.attempts = attempt + 1"]
+    Count --> Eligible{"Transient result and attempt < maxRetries?"}
+    Eligible -->|No| Return([Return current result])
+    Eligible -->|Yes| Backoff["backoff = min(maxRetryDelayMs, retryBaseMs * 2^attempt * (0.5 + random))"]
+    Backoff --> Delay["delay = max(backoff, retryAfterMs or 0)"]
+    Delay --> Budget{"Retry-After present but invalid, or delay > maxRetryDelayMs?"}
+    Budget -->|Yes| Deferred["Return deferred: retry-after"]
+    Budget -->|No| Sleep["Wait ceil(delay) milliseconds"]
+    Sleep --> Next["Increment attempt"]
+    Next --> Once
+```
+
+At most `maxRetries + 1` requests run per hop. Retry-After is inspected only when
+another retry is eligible; an exhausted retry loop returns the existing failure.
+The delay limit is per wait, not a total fetch deadline. Each request gets a fresh
+deadline, and each redirect hop gets its own retry budget.
+
+</details>
+
+<details>
+<summary>3. requestOnce(): deadline, response validation, and streaming</summary>
+
+```mermaid
+flowchart TD
+    Start([One HTTP attempt]) --> Init["Initialize byte count, chunks, abort controller, and finish guard"]
+    Init --> Timer["Start requestTimeoutMs deadline"]
+    Timer --> Send["Send HTTP/HTTPS GET; no automatic redirects or caller credentials"]
+    Timer -.->|Deadline expires before completion| Timeout["failed: timeout; transient = true"]
+    Send -->|Request error| Network["failed: network; transient only for approved error codes"]
+    Send -->|Response headers| Redirect{"Status is 301, 302, 303, 307, or 308?"}
+    Redirect -->|Yes| Location{"Nonempty Location?"}
+    Location -->|Yes| Hop["ok with Location; do not read body"]
+    Location -->|No| InvalidRedirect["failed: invalid-redirect"]
+    Redirect -->|No| Partial{"Status is 206?"}
+    Partial -->|Yes| PartialFail["failed: http; not transient"]
+    Partial -->|No| Success{"Status is 200-299?"}
+    Success -->|No| Http["failed: http; parse Retry-After; transient only for 408, 429, 500, 502, 503, 504"]
+    Success -->|Yes| Type{"Content-Type valid for kind?"}
+    Type -->|No| TypeFail["failed: content-type"]
+    Type -->|Yes| Encoding{"Content-Encoding absent, empty, or identity?"}
+    Encoding -->|No| EncodingSkip["skipped: encoding"]
+    Encoding -->|Yes| Cap["Select maxImageBytes for images; maxPageBytes otherwise"]
+    Cap --> Events{"Next response event"}
+    Events -->|data| Bytes["Add chunk length to byte count"]
+    Bytes --> Limit{"bytes > cap?"}
+    Limit -->|Yes| ByteFail["failed: byte-limit"]
+    Limit -->|No| Kind{"Image kind?"}
+    Kind -->|Yes| Discard["Discard chunk"]
+    Kind -->|No| Buffer["Buffer document or asset chunk"]
+    Discard --> Events
+    Buffer --> Events
+    Events -->|error| StreamFail["failed: network; transient = true"]
+    Events -->|end| Complete["ok; bytesComplete = true; non-images include body and charset"]
+    Timeout --> Finish
+    Network --> Finish
+    Hop --> Finish
+    InvalidRedirect --> Finish
+    PartialFail --> Finish
+    Http --> Finish
+    TypeFail --> Finish
+    EncodingSkip --> Finish
+    ByteFail --> Finish
+    StreamFail --> Finish
+    Complete --> Finish
+    Finish["finish: accept first outcome, clear timer, resolve hop, release chunks, abort request"] --> Return([Return hop])
+```
+
+Documents accept HTML/XHTML, images require an image MIME type, and assets require
+a nonempty content type. Request-error retry codes are `ECONNRESET`, `ETIMEDOUT`,
+`EAI_AGAIN`, `ECONNREFUSED`, and `EPIPE`; response-stream errors are always marked
+transient. Only a completed body sets `bytesComplete = true`. The first completion
+wins; later timeout/error/end events cannot replace its result.
+
+</details>
+
 ## Database-backed pagination
 
 Public REST/MCP pages use versioned opaque cursors and the same page envelope.
