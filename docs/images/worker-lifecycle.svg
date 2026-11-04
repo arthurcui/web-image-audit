@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1810" viewBox="0 0 1560 1810" role="img" aria-labelledby="title desc">
+<title id="title">Worker lifecycle</title><desc id="desc">Atomic claims, inspection outside transactions, lease-fenced publication, retries, and shutdown. Detailed Mermaid source is in docs/DECISIONS.md.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#475569"/></marker><filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#16324f" flood-opacity=".09"/></filter></defs>
+<rect width="1560" height="1810" fill="#edf2f7"/>
+<text x="40" y="49" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" text-anchor="start" fill="#203247"><tspan x="40" dy="0">Worker lifecycle</tspan></text>
+<text x="40" y="80" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#526277"><tspan x="40" dy="0">Durable jobs. Short transactions. Lease-fenced writes.</tspan></text>
+<circle cx="650" cy="49" r="7" fill="#e3effc" stroke="#7298c1"/>
+<text x="664" y="54" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#203247"><tspan x="664" dy="0">Queue / lifecycle step</tspan></text>
+<circle cx="824" cy="49" r="7" fill="#ede5fa" stroke="#a68ac7"/>
+<text x="838" y="54" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#203247"><tspan x="838" dy="0">Inspection / network</tspan></text>
+<circle cx="998" cy="49" r="7" fill="#fff2cb" stroke="#c6a24a"/>
+<text x="1012" y="54" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#203247"><tspan x="1012" dy="0">Decision</tspan></text>
+<circle cx="1172" cy="49" r="7" fill="#dff1df" stroke="#7aab7a"/>
+<text x="1186" y="54" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#203247"><tspan x="1186" dy="0">Completed</tspan></text>
+<circle cx="1346" cy="49" r="7" fill="#ffe1db" stroke="#cc8174"/>
+<text x="1360" y="54" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#203247"><tspan x="1360" dy="0">Failure / lease loss</tspan></text>
+<rect x="30" y="110" width="1500" height="350" rx="16" fill="white" stroke="#c9d5e2"/>
+<rect x="50" y="128" width="36" height="36" rx="10" fill="#263e59"/>
+<text x="68" y="153" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" text-anchor="middle" fill="white"><tspan x="68" dy="0">1</tspan></text>
+<text x="102" y="147" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#203247"><tspan x="102" dy="0">Claim &amp; recover  ·  One short SQLite transaction</tspan></text>
+<text x="102" y="171" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#64748b"><tspan x="102" dy="0">Poll only while running. Recovery is part of claim(), not a separate reaper.</tspan></text>
+<rect x="65" y="205" width="315" height="85" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="222.5" y="231.01000000000002" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="222.5" dy="0">Recover up to 100 expired leases</tspan><tspan x="222.5" dy="22.1">Record lease_expired attempt</tspan><tspan x="222.5" dy="22.1">Requeue or fail if attempts exhausted</tspan></text>
+<rect x="465" y="205" width="330" height="85" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="630.0" y="231.01000000000002" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="630.0" dy="0">Select one eligible queued job</tspan><tspan x="630.0" dy="22.1">available_at, created_at, id</tspan><tspan x="630.0" dy="22.1">No job? Commit and wait 500 ms</tspan></text>
+<rect x="880" y="205" width="590" height="85" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1175.0" y="231.01000000000002" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1175.0" dy="0">Clear prior result; set running; increment attempt</tspan><tspan x="1175.0" dy="22.1">Assign random lease token + 30-second expiry</tspan><tspan x="1175.0" dy="22.1">Record attempt and commit</tspan></text>
+<polyline points="380,247 465,247" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<polyline points="795,247 880,247" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="837" y="235" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="837" dy="0">Found</tspan></text>
+<rect x="65" y="335" width="1405" height="70" rx="10" fill="#f1f5f9" stroke="#9aaaba" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="767.5" y="364.24" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="767.5" dy="0">Only one worker claims each queued attempt. Recovery may repeat inspection after a crash.</tspan><tspan x="767.5" dy="23.400000000000002">Read the clock after acquiring the write lock. Never hold this transaction during network work.</tspan></text>
+<rect x="30" y="540" width="1500" height="390" rx="16" fill="white" stroke="#c9d5e2"/>
+<rect x="50" y="558" width="36" height="36" rx="10" fill="#263e59"/>
+<text x="68" y="583" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" text-anchor="middle" fill="white"><tspan x="68" dy="0">2</tspan></text>
+<text x="102" y="577" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#203247"><tspan x="102" dy="0">Execute &amp; heartbeat  ·  Inspection outside database transactions</tspan></text>
+<text x="102" y="601" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#64748b"><tspan x="102" dy="0">One active job per worker process. Multiple processes can share the SQLite file.</tspan></text>
+<rect x="65" y="650" width="370" height="90" rx="10" fill="#ede5fa" stroke="#a68ac7" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="250.0" y="677.5400000000001" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="250.0" dy="0">runAudit(url, options, hooks)</tspan><tspan x="250.0" dy="23.400000000000002">Discover documents and inspect images</tspan><tspan x="250.0" dy="23.400000000000002">No open database transaction</tspan></text>
+<rect x="540" y="650" width="385" height="90" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="732.5" y="679.48" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="732.5" dy="0">Every 5 seconds: renew job lease</tspan><tspan x="732.5" dy="20.8">On callbacks: write document / image progress</tspan><tspan x="732.5" dy="20.8">Each write is a short fenced transaction</tspan></text>
+<rect x="1030" y="650" width="440" height="90" rx="45.0" fill="#ffe1db" stroke="#cc8174" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1250.0" y="679.48" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1250.0" dy="0">Heartbeat false / throws, or progress false:</tspan><tspan x="1250.0" dy="20.8">mark locally lost; suppress later progress</tspan><tspan x="1250.0" dy="20.8">Let network work settle; discard result</tspan></text>
+<polyline points="435,695 540,695" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)" stroke-dasharray="6 5"/>
+<text x="488" y="679" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="488" dy="0">During audit</tspan></text>
+<polyline points="925,695 1030,695" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="976" y="679" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="976" dy="0">Lease lost</tspan></text>
+<rect x="65" y="800" width="1405" height="65" rx="10" fill="#f1f5f9" stroke="#9aaaba" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="767.5" y="826.74" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="767.5" dy="0">Separate process-presence heartbeat feeds readiness. It does not grant ownership of a job.</tspan><tspan x="767.5" dy="23.400000000000002">The database fence checks running state + matching token + unexpired lease on every write.</tspan></text>
+<rect x="30" y="1010" width="1500" height="440" rx="16" fill="white" stroke="#c9d5e2"/>
+<rect x="50" y="1028" width="36" height="36" rx="10" fill="#263e59"/>
+<text x="68" y="1053" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" text-anchor="middle" fill="white"><tspan x="68" dy="0">3</tspan></text>
+<text x="102" y="1047" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#203247"><tspan x="102" dy="0">Publish or retry  ·  Recheck ownership under the write lock</tspan></text>
+<text x="102" y="1071" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#64748b"><tspan x="102" dy="0">Prepare result rows before the transaction; commit related state and result changes atomically.</tspan></text>
+<path d="M185.0 1120 L305 1172.5 L185.0 1225 L65 1172.5Z" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5"/>
+<text x="185.0" y="1167.06" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="185.0" dy="0">Local lease</tspan><tspan x="185.0" dy="22.1">lost?</tspan></text>
+<rect x="65" y="1290" width="240" height="60" rx="30.0" fill="#ffe1db" stroke="#cc8174" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="185.0" y="1325.61" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="185.0" dy="0">Discard result</tspan></text>
+<polyline points="185,1225 185,1290" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="210" y="1260" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="210" dy="0">Yes</tspan></text>
+<path d="M520.0 1120 L640 1172.5 L520.0 1225 L400 1172.5Z" fill="#fff2cb" stroke="#c6a24a" stroke-width="1.5"/>
+<text x="520.0" y="1167.06" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="520.0" dy="0">Root page</tspan><tspan x="520.0" dy="22.1">succeeded?</tspan></text>
+<polyline points="305,1172 400,1172" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="350" y="1160" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="350" dy="0">No</tspan></text>
+<rect x="750" y="1095" width="720" height="85" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1110.0" y="1120.04" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1110.0" dy="0">complete(): fence → publish rows + summary + completed state</tspan><tspan x="1110.0" dy="23.400000000000002">Record attempt outcome and clear lease.</tspan><tspan x="1110.0" dy="23.400000000000002">Individual image failures still allow a completed audit.</tspan></text>
+<polyline points="640,1160 695,1160 695,1137 750,1137" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="688" y="1122" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="688" dy="0">Yes</tspan></text>
+<rect x="750" y="1220" width="720" height="85" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1110.0" y="1245.04" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1110.0" dy="0">fail(): fence → retryable with attempts left? Queue for later.</tspan><tspan x="1110.0" dy="23.400000000000002">Otherwise mark failed; retain a diagnostic result only if supplied.</tspan><tspan x="1110.0" dy="23.400000000000002">Record failure / attempt outcome and clear lease.</tspan></text>
+<polyline points="640,1193 695,1193 695,1262 750,1262" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<text x="690" y="1210" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#526277"><tspan x="690" dy="0">No / error</tspan></text>
+<rect x="385" y="1337" width="1085" height="65" rx="10" fill="#f1f5f9" stroke="#9aaaba" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="927.5" y="1364.06" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="927.5" dy="0">Fence rejected → no result or state change. Always clear the job heartbeat when the attempt settles.</tspan><tspan x="927.5" dy="22.1">Continue polling unless stopping; thrown queue errors are reported by the outer loop.</tspan></text>
+<rect x="30" y="1530" width="1500" height="210" rx="16" fill="white" stroke="#c9d5e2"/>
+<rect x="50" y="1548" width="36" height="36" rx="10" fill="#263e59"/>
+<text x="68" y="1573" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" text-anchor="middle" fill="white"><tspan x="68" dy="0">4</tspan></text>
+<text x="102" y="1567" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#203247"><tspan x="102" dy="0">Graceful shutdown  ·  Stop claiming, then drain</tspan></text>
+<text x="102" y="1591" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#64748b"><tspan x="102" dy="0">SIGINT / SIGTERM affects process presence and job leases differently.</tspan></text>
+<rect x="65" y="1620" width="360" height="70" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="245.0" y="1649.56" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="245.0" dy="0">Remove readiness presence</tspan><tspan x="245.0" dy="22.1">Set stopping; interrupt idle wait</tspan></text>
+<rect x="535" y="1620" width="460" height="70" rx="10" fill="#e3effc" stroke="#7298c1" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="765.0" y="1649.56" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="765.0" dy="0">No new claims</tspan><tspan x="765.0" dy="22.1">Current audit keeps renewing its job lease</tspan></text>
+<rect x="1105" y="1620" width="365" height="70" rx="35.0" fill="#dff1df" stroke="#7aab7a" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="1287.5" y="1649.56" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" text-anchor="middle" fill="#203247"><tspan x="1287.5" dy="0">Attempt settles → clear timer</tspan><tspan x="1287.5" dy="22.1">Exit loop → close database</tspan></text>
+<polyline points="425,1655 535,1655" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<polyline points="995,1655 1105,1655" fill="none" stroke="#475569" stroke-width="1.7" marker-end="url(#arrow)"/>
+<path d="M780 463 V524" stroke="#245b9e" stroke-width="5"/><path d="M770 521 L780 537 L790 521Z" fill="#245b9e"/>
+<text x="810" y="506" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" text-anchor="start" fill="#245b9e"><tspan x="810" dy="0">Claimed job</tspan></text>
+<path d="M780 933 V994" stroke="#245b9e" stroke-width="5"/><path d="M770 991 L780 1007 L790 991Z" fill="#245b9e"/>
+<text x="810" y="976" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" text-anchor="start" fill="#245b9e"><tspan x="810" dy="0">Audit settles</tspan></text>
+<path d="M780 1453 V1514" stroke="#245b9e" stroke-width="5"/><path d="M770 1511 L780 1527 L790 1511Z" fill="#245b9e"/>
+<text x="810" y="1496" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" text-anchor="start" fill="#245b9e"><tspan x="810" dy="0">When stopping</tspan></text>
+<text x="40" y="1780" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" text-anchor="start" fill="#526277"><tspan x="40" dy="0">At-least-once execution; stale attempts cannot publish. Job retries are separate from per-request HTTP retries.</tspan></text>
+</svg>

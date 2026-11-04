@@ -159,6 +159,89 @@ results. This gives at-least-once execution, not exactly-once network activity.
 Clock and process pauses can cause duplicate inspection; stale workers cannot publish.
 Graceful shutdown stops claiming and drains the current bounded audit.
 
+### Worker lifecycle
+
+Sources: [runner](../src/worker/runner.ts), [process lifecycle](../src/worker/main.ts),
+and [SQLite queue](../src/infrastructure/sqlite/job-store.ts).
+
+[![Worker lifecycle: atomic claim, inspection, lease fencing, retry, and shutdown](images/worker-lifecycle.svg)](images/worker-lifecycle.svg)
+
+Claim and publication use short database transactions; inspection runs outside them.
+The SVG is a compact overview; the Mermaid below retains the detailed branches.
+
+<details>
+<summary>Worker lifecycle — editable Mermaid source</summary>
+
+```mermaid
+flowchart TD
+    Start([Start worker]) --> Presence["Start process-presence heartbeat for readiness"]
+    Presence --> Stop{"Stopping?"}
+    Stop -->|Yes| Close["Stop presence; close database after run exits"]
+    Stop -->|No| Claim["claim: short SQLite IMMEDIATE transaction"]
+    Claim --> Recover["Recover up to 100 expired running jobs; record lease_expired attempt"]
+    Recover --> Exhausted{"Expired job exhausted attempts?"}
+    Exhausted -->|Yes| ExpiredFail["Mark expired job failed; clear lease"]
+    Exhausted -->|No| Requeue["Requeue expired job immediately; clear lease"]
+    ExpiredFail --> Select
+    Requeue --> Select
+    Recover -->|No expired jobs| Select["Select one eligible queued job ordered by available_at, created_at, id"]
+    Select --> Found{"Job available?"}
+    Found -->|No| Idle["Commit; wait pollMs unless stopping"]
+    Idle --> Stop
+    Found -->|Yes| Assign["Delete old result; set running; increment attempt; assign token and expiry; record attempt; commit"]
+    Assign --> Run["Start job heartbeat timer; await runAudit outside transactions"]
+    Run -.->|Timer tick| Heartbeat["Renew lease with token, running-state, and expiry checks"]
+    Heartbeat -->|False or exception| Lost["Set local lost flag"]
+    Run -.->|Progress callback while not lost| Progress["Update document/image progress with the same lease fence"]
+    Progress -->|False| Lost
+    Progress -->|Exception propagates| Catch
+    Run -->|Returns| WasLost{"Local lease-loss flag set?"}
+    WasLost -->|Yes| Discard["Log lease loss; discard result"]
+    WasLost -->|No| Page{"result.page.state is ok?"}
+    Page -->|Yes| Complete["Prepare rows outside transaction; complete under write lock and lease fence"]
+    Complete -->|Fence valid| Publish["Atomically publish result, summary, completed state and attempt outcome; clear lease"]
+    Complete -->|Fence rejected| Discard
+    Page -->|No| Failure["Classify page failure; calculate job retry delay"]
+    Run -->|Throws| Catch["If not locally lost, call fail with retryable worker_error and backoff"]
+    Catch --> Fail
+    Failure --> Fail["fail: prepare optional result; acquire write lock; validate lease fence"]
+    Fail -->|Fence rejected| NoWrite["No state or result write"]
+    Fail -->|Fence valid| Retry{"Retryable and attempts remain?"}
+    Retry -->|Yes| Scheduled["Clear old results; set queued and available_at; record failure and retry outcome; clear lease"]
+    Retry -->|No| Terminal["Set failed; publish diagnostic result only if supplied; record failure and attempt; clear lease"]
+    Catch -->|Already locally lost| NoWrite
+    Publish --> Cleanup["Finally: clear job heartbeat timer"]
+    Discard --> Cleanup
+    NoWrite --> Cleanup
+    Scheduled --> Cleanup
+    Terminal --> Cleanup
+    Cleanup --> Stop
+    Claim -.->|Throws| Outer["Report loop error; wait pollMs unless stopping"]
+    Outer --> Stop
+    Signal([SIGINT or SIGTERM]) --> Drain["Remove process presence; set stopping; interrupt idle wait"]
+    Drain -.->|No new claims| Stop
+    Drain -.->|Current audit keeps its job heartbeat until settled| Run
+```
+
+- Defaults: one job per process, 30-second lease, five-second job heartbeat, and
+  500 ms idle polling. Other processes may claim different jobs concurrently.
+- Readiness presence is separate from the job lease. A false/throwing lease
+  heartbeat marks the attempt locally lost. Network work is not cancelled;
+  subsequent progress is suppressed and returned results are discarded.
+- The database independently checks running state, token, and unexpired lease
+  under the write lock. A heartbeat is not permission to publish later.
+- Root-page success permits completion despite individual image failures.
+  Retryable page failures honor Retry-After up to one day and exponential job
+  backoff; longer Retry-After values are non-retryable. Unexpected worker errors
+  request a bounded retry. A terminal failure may retain a supplied diagnostic result.
+- Recovery happens during claim polling, not in a separate reaper. A crashed
+  worker's lease must expire before recovery; duplicate inspection remains possible.
+- Graceful shutdown stops new claims and drains work with job heartbeats. If a
+  queue write throws, the outer loop reports it; any remaining lease can expire
+  and be recovered. No exactly-once execution or forced-cancellation guarantee.
+
+</details>
+
 ## Shared REST and MCP services
 
 AuditService centralizes ownership and idempotency; shared schemas validate inputs
@@ -195,8 +278,8 @@ entire request lifecycle.
 
 [![Combined HTTP fetch flow: redirects, retries, and a single request](images/http-fetch-control-flow.svg)](images/http-fetch-control-flow.svg)
 
-Open the SVG at full size to inspect the branches. The Mermaid source below is
-the editable source of truth; regenerate the SVG when these flows change.
+The SVG summarizes the three layers in compact, color-coded panels. The Mermaid
+source below retains the detailed branches; keep the SVG aligned when these flows change.
 
 <details>
 <summary>1. createFetcher(): policy, image-hop cache, and redirects</summary>
