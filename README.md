@@ -37,6 +37,15 @@ A 6.5 minute walkthrough with narration and visible
 captions. It demonstrates the local fixture, actionable findings, MCP calls, and
 design highlights. See the [demo outline](docs/DEMO.md).
 
+## Engineering highlights
+
+- **Recoverable jobs:** SQLite queue with atomic claims, lease recovery, and stale-worker protection.
+- **Shared authorization:** REST and MCP use the same owner-scoped application services.
+- **Precise image modeling:** Separate resources, HTML occurrences, and responsive candidates.
+- **Bounded inspection:** Static and Chromium scans enforce host, redirect, byte, and deadline limits.
+
+See [architecture decisions and trade-offs](docs/DECISIONS.md).
+
 ## Quick start: deterministic demo
 
 Prerequisites: Node.js **24 LTS** (or 26), npm, and an OS supported by Playwright.
